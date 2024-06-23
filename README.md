@@ -43,6 +43,29 @@ Our tool accepts input in JSON format. The initial parameter provided to the exe
 }
 ```
 
+## Discussions
+
+### The Reason Behind Our Custom Node Structure
+
+Originally, our tool utilized the types and interfaces provided by the `go/ast` package, such as `ast.BlockStmt` and `ast.Expr`. As we developed more features, it became clear that implementing operations required processing almost every type in `go/ast`, which was inefficient and prone to errors.
+
+Our solution, still in use today, was to create a bespoke representation for an `ast.Node`, which we call `NodeInfo`. This structure uses a straightforward mapping approach, linking each `ast.Node` field to a representative `NodeInfo`, drawing inspiration from reflection in Python.
+
+Now, handling the standard types in `go/ast` has become streamlined, leaving us to focus on the nuances of certain complex types, such as `ast.Ident`, `ast.SelectorExpr`, and `ast.BlockStmt`. This method has brought a new level of precision and ease to our implementation process.
+
+### AI Assistance in Development
+
+In our development process, we integrate APIs from libraries like `go/ast` and `reflect`. As developers focused on crafting feature logic, we were initially not well-versed with these APIs, unaware of the specifics they offered. Fortunately, with the advent of language model AI, this gap in our knowledge isn't a setback; AI fills it.
+
+Our team leans heavily on AI support. Typically, we specify a function's signature and description and let AI craft the function. We then fix bugs and integrate these AI-generated functions to build the complete program.
+
+We've noticed a few AI patterns:
+
+- Simple functions are often generated flawlessly.
+- AI tends to struggle or provide incomplete answers with ellipses for highly complex requests.
+- For less common functions, the AI-generated code might contain errors.
+- A more effective strategy involves providing a partly written function with placeholders, allowing the AI to complete the details.
+
 # License
 
 This work is licensed under a Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
