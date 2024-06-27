@@ -23,7 +23,6 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 	}
 
 	// BlockStmt
-	// always return a non nil result
 	if nodeInfo.Type == "*ast.BlockStmt" {
 		newNodeInfo.NodeListFields["List"] = newNodeInfo.NodeListFields["List"][:0]
 		for _, fieldNodeInfo := range nodeInfo.NodeListFields["List"] {
@@ -35,6 +34,22 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 				}
 			} else if fieldNodeInfo.Type == "*ast.ReturnStmt" {
 				newNodeInfo.NodeListFields["List"] = append(newNodeInfo.NodeListFields["List"], fieldNewNodeInfo)
+			}
+		}
+		return
+	}
+
+	if nodeInfo.Type == "*ast.CaseClause" {
+		newNodeInfo.NodeListFields["Body"] = newNodeInfo.NodeListFields["Body"][:0]
+		for _, fieldNodeInfo := range nodeInfo.NodeListFields["Body"] {
+			fieldNewNodeInfo, fieldIsRelevant := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
+			if fieldIsRelevant {
+				isRelevant = true
+				if fieldNewNodeInfo != nil {
+					newNodeInfo.NodeListFields["Body"] = append(newNodeInfo.NodeListFields["Body"], fieldNewNodeInfo)
+				}
+			} else if fieldNodeInfo.Type == "*ast.ReturnStmt" {
+				newNodeInfo.NodeListFields["Body"] = append(newNodeInfo.NodeListFields["Body"], fieldNewNodeInfo)
 			}
 		}
 		return
@@ -66,22 +81,31 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 }
 
 func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
-	varName := taskCtx.Input.VarName
+	var nameParts []string
 	switch x := expr.(type) {
 	case *ast.Ident:
-		return x.Name == varName
+		nameParts = []string{x.Name}
 	case *ast.SelectorExpr:
 		// If varName is in the form of "a.B.C", construct the full name from SelectorExpr
-		fullVarName := GetSelectorExprFullName(x)
-		return strings.HasPrefix(fullVarName, varName) || strings.HasPrefix(varName, fullVarName)
+		nameParts = GetSelectorExprNameParts(x)
 	default:
 		return false
 	}
+	varNameParts := strings.Split(taskCtx.Input.VarName, ".")
+	for i := 0; i < len(varNameParts); i++ {
+		if i >= len(nameParts) {
+			return true
+		}
+		if nameParts[i] != varNameParts[i] {
+			return false
+		}
+	}
+	return true
 }
 
-// GetSelectorExprFullName recursively constructs the full variable name from a SelectorExpr,
+// GetSelectorExprNameParts recursively constructs the full variable name from a SelectorExpr,
 // which can represent an expression like "a.B.C".
-func GetSelectorExprFullName(expr *ast.SelectorExpr) string {
+func GetSelectorExprNameParts(expr *ast.SelectorExpr) []string {
 	var parts []string
 	for expr != nil {
 		parts = append([]string{expr.Sel.Name}, parts...)
@@ -94,5 +118,5 @@ func GetSelectorExprFullName(expr *ast.SelectorExpr) string {
 		}
 		expr = x
 	}
-	return strings.Join(parts, ".")
+	return parts
 }
