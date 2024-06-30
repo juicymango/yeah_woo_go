@@ -91,16 +91,20 @@ func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
 	default:
 		return false
 	}
-	varNameParts := strings.Split(taskCtx.Input.VarName, ".")
-	for i := 0; i < len(varNameParts); i++ {
-		if i >= len(nameParts) {
+	for _, varName := range taskCtx.Input.VarNames {
+		match := true
+		varNameParts := strings.Split(varName, ".")
+		for i := 0; i < len(varNameParts) && i < len(nameParts); i++ {
+			if nameParts[i] != varNameParts[i] {
+				match = false
+				break
+			}
+		}
+		if match {
 			return true
 		}
-		if nameParts[i] != varNameParts[i] {
-			return false
-		}
 	}
-	return true
+	return false
 }
 
 // GetSelectorExprNameParts recursively constructs the full variable name from a SelectorExpr,

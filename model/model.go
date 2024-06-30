@@ -5,10 +5,10 @@ import (
 )
 
 type Input struct {
-	Method   string `json:"method"`
-	Source   string `json:"source"`
-	FuncName string `json:"func_name"`
-	VarName  string `json:"var_name"`
+	Method   string   `json:"method"`
+	Source   string   `json:"source"`
+	FuncName string   `json:"func_name"`
+	VarNames []string `json:"var_names"`
 }
 
 type TaskCtx struct {
