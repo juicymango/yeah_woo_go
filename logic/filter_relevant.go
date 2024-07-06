@@ -22,6 +22,12 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 		return
 	}
 
+	// Return
+	if nodeInfo.Type == "*ast.ReturnStmt" && taskCtx.Input.ShowReturn {
+		isRelevant = true
+		return
+	}
+
 	// BlockStmt
 	if nodeInfo.Type == "*ast.BlockStmt" {
 		newNodeInfo.NodeListFields["List"] = newNodeInfo.NodeListFields["List"][:0]
@@ -32,8 +38,6 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 				if fieldNewNodeInfo != nil {
 					newNodeInfo.NodeListFields["List"] = append(newNodeInfo.NodeListFields["List"], fieldNewNodeInfo)
 				}
-			} else if fieldNodeInfo.Type == "*ast.ReturnStmt" {
-				newNodeInfo.NodeListFields["List"] = append(newNodeInfo.NodeListFields["List"], fieldNewNodeInfo)
 			}
 		}
 		return
