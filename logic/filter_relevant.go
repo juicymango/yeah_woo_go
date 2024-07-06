@@ -27,6 +27,16 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 		isRelevant = true
 		return
 	}
+	// Break
+	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "break" && taskCtx.Input.FuncTask.ShowBreak {
+		isRelevant = true
+		return
+	}
+	// Continue
+	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "continue" && taskCtx.Input.FuncTask.ShowContinue {
+		isRelevant = true
+		return
+	}
 
 	// BlockStmt
 	if nodeInfo.Type == "*ast.BlockStmt" {
@@ -43,6 +53,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 		return
 	}
 
+	// CaseClause
 	if nodeInfo.Type == "*ast.CaseClause" {
 		newNodeInfo.NodeListFields["Body"] = newNodeInfo.NodeListFields["Body"][:0]
 		for _, fieldNodeInfo := range nodeInfo.NodeListFields["Body"] {
