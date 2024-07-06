@@ -102,6 +102,7 @@ func GetRelevantFunc(input *model.Input) {
 	newNodeInfo, _ := logic.FilterRelevantNodeInfo(&taskCtx, nodeInfo)
 
 	util.NodeInfoUpdateNode(newNodeInfo)
+	fmt.Printf("//file://%s\n", input.Source)
 	err = printer.Fprint(os.Stdout, fset, newNodeInfo.Node)
 	if err != nil {
 		log.Printf("GetRelevantFunc FprintErr %+v", err)
