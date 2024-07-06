@@ -23,7 +23,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (n
 	}
 
 	// Return
-	if nodeInfo.Type == "*ast.ReturnStmt" && taskCtx.Input.ShowReturn {
+	if nodeInfo.Type == "*ast.ReturnStmt" && taskCtx.Input.FuncTask.ShowReturn {
 		isRelevant = true
 		return
 	}
@@ -95,7 +95,7 @@ func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
 	default:
 		return false
 	}
-	for _, varName := range taskCtx.Input.VarNames {
+	for _, varName := range taskCtx.Input.FuncTask.VarNames {
 		match := true
 		varNameParts := strings.Split(varName, ".")
 		for i := 0; i < len(varNameParts) && i < len(nameParts); i++ {

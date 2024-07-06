@@ -5,17 +5,16 @@ import (
 )
 
 type Input struct {
-	Method     string   `json:"method"`
+	Method   string     `json:"method"`
+	FuncTask FuncTask   `json:"func_task"`
+	Funcs    []FuncTask `json:"funcs"`
+}
+
+type FuncTask struct {
 	Source     string   `json:"source"`
 	FuncName   string   `json:"func_name"`
 	VarNames   []string `json:"var_names"`
 	ShowReturn bool     `json:"show_return"`
-	Funcs      []struct {
-		Source     string   `json:"source"`
-		FuncName   string   `json:"func_name"`
-		VarNames   []string `json:"var_names"`
-		ShowReturn bool     `json:"show_return"`
-	} `json:"funcs"`
 }
 
 type TaskCtx struct {

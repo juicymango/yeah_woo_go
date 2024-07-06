@@ -50,12 +50,12 @@ func GetFuncNodeInfo(input *model.Input) {
 	fset := token.NewFileSet()
 
 	// Parse the file containing the Go program
-	fileNode, err := parser.ParseFile(fset, input.Source, nil, parser.ParseComments)
+	fileNode, err := parser.ParseFile(fset, input.FuncTask.Source, nil, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
 
-	funcDecl := util.GetFunc(fileNode, input.FuncName)
+	funcDecl := util.GetFunc(fileNode, input.FuncTask.FuncName)
 	nodeInfo := util.GetNodeInfo(funcDecl)
 	funcJson, jsonErr := json.Marshal(nodeInfo)
 	if jsonErr != nil {
@@ -70,7 +70,7 @@ func GetFileNodeInfo(input *model.Input) {
 	fset := token.NewFileSet()
 
 	// Parse the file containing the Go program
-	fileNode, err := parser.ParseFile(fset, input.Source, nil, parser.ParseComments)
+	fileNode, err := parser.ParseFile(fset, input.FuncTask.Source, nil, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
@@ -89,12 +89,12 @@ func GetRelevantFunc(input *model.Input) {
 	fset := token.NewFileSet()
 
 	// Parse the file containing the Go program
-	fileNode, err := parser.ParseFile(fset, input.Source, nil, parser.ParseComments)
+	fileNode, err := parser.ParseFile(fset, input.FuncTask.Source, nil, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
 
-	funcDecl := util.GetFunc(fileNode, input.FuncName)
+	funcDecl := util.GetFunc(fileNode, input.FuncTask.FuncName)
 	nodeInfo := util.GetNodeInfo(funcDecl)
 	taskCtx := model.TaskCtx{
 		Input: input,
@@ -102,7 +102,7 @@ func GetRelevantFunc(input *model.Input) {
 	newNodeInfo, _ := logic.FilterRelevantNodeInfo(&taskCtx, nodeInfo)
 
 	util.NodeInfoUpdateNode(newNodeInfo)
-	fmt.Printf("//file://%s\n", input.Source)
+	fmt.Printf("//file://%s\n", input.FuncTask.Source)
 	err = printer.Fprint(os.Stdout, fset, newNodeInfo.Node)
 	if err != nil {
 		log.Printf("GetRelevantFunc FprintErr %+v", err)
@@ -112,10 +112,7 @@ func GetRelevantFunc(input *model.Input) {
 
 func GetRelevantFuncs(input *model.Input) {
 	for _, fn := range input.Funcs {
-		input.Source = fn.Source
-		input.FuncName = fn.FuncName
-		input.VarNames = fn.VarNames
-		input.ShowReturn = fn.ShowReturn
+		input.FuncTask = fn
 		GetRelevantFunc(input)
 		fmt.Println()
 		fmt.Println()
