@@ -34,6 +34,8 @@ func Handle(filePath string) {
 	switch input.Method {
 	case "GetRelevantFunc":
 		GetRelevantFunc(&input)
+	case "GetRelevantFuncs":
+		GetRelevantFuncs(&input)
 	case "GetFuncNodeInfo":
 		GetFuncNodeInfo(&input)
 	case "GetFileNodeInfo":
@@ -104,5 +106,17 @@ func GetRelevantFunc(input *model.Input) {
 	if err != nil {
 		log.Printf("GetRelevantFunc FprintErr %+v", err)
 		return
+	}
+}
+
+func GetRelevantFuncs(input *model.Input) {
+	for _, fn := range input.Funcs {
+		input.Source = fn.Source
+		input.FuncName = fn.FuncName
+		input.VarNames = fn.VarNames
+		input.ShowReturn = fn.ShowReturn
+		GetRelevantFunc(input)
+		fmt.Println()
+		fmt.Println()
 	}
 }

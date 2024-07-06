@@ -10,6 +10,12 @@ type Input struct {
 	FuncName   string   `json:"func_name"`
 	VarNames   []string `json:"var_names"`
 	ShowReturn bool     `json:"show_return"`
+	Funcs      []struct {
+		Source     string   `json:"source"`
+		FuncName   string   `json:"func_name"`
+		VarNames   []string `json:"var_names"`
+		ShowReturn bool     `json:"show_return"`
+	} `json:"funcs"`
 }
 
 type TaskCtx struct {
