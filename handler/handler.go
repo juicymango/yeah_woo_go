@@ -31,21 +31,19 @@ func Handle(filePath string) {
 		log.Fatalf("Error unmarshaling JSON: %v", err)
 		return
 	}
-	switch input.Method {
-	case "GetRelevantFunc":
-		GetRelevantFunc(&input)
-	case "GetRelevantFuncs":
-		GetRelevantFuncs(&input)
-	case "GetFuncNodeInfo":
-		GetFuncNodeInfo(&input)
-	case "GetFileNodeInfo":
-		GetFileNodeInfo(&input)
-	default:
-		log.Fatalf("unknown method: %+v", input)
+	methodFuncMap := map[string]func(string, *model.Input){
+		"GetRelevantFuncs": GetRelevantFuncs,
+		"GetFuncNodeInfo":  GetFuncNodeInfo,
+		"GetFileNodeInfo":  GetFileNodeInfo,
 	}
+	method := methodFuncMap[input.Method]
+	if method == nil {
+		log.Fatalf("unknown method, methods:%+v, input:%+v", methodFuncMap, input)
+	}
+	method(filePath, &input)
 }
 
-func GetFuncNodeInfo(input *model.Input) {
+func GetFuncNodeInfo(filePath string, input *model.Input) {
 	// Create a new token file set which is needed for parsing
 	fset := token.NewFileSet()
 
@@ -59,13 +57,13 @@ func GetFuncNodeInfo(input *model.Input) {
 	nodeInfo := util.GetNodeInfo(funcDecl)
 	funcJson, jsonErr := json.Marshal(nodeInfo)
 	if jsonErr != nil {
-		log.Printf("GetFuncNodeInfo MarshalErr %+v", err)
+		log.Printf("GetFuncNodeInfo MarshalErr %+v", jsonErr)
 		return
 	}
 	fmt.Println(string(funcJson))
 }
 
-func GetFileNodeInfo(input *model.Input) {
+func GetFileNodeInfo(filePath string, input *model.Input) {
 	// Create a new token file set which is needed for parsing
 	fset := token.NewFileSet()
 
@@ -84,37 +82,73 @@ func GetFileNodeInfo(input *model.Input) {
 	fmt.Println(string(funcJson))
 }
 
-func GetRelevantFunc(input *model.Input) {
-	// Create a new token file set which is needed for parsing
-	fset := token.NewFileSet()
+func GetRelevantFuncs(filePath string, input *model.Input) {
+	taskCtx := &model.TaskCtx{
+		Input:       input,
+		FuncTaskMap: make(map[model.FuncTaskKey]*model.NodeInfo),
+		FileSet:     token.NewFileSet(),
+	}
+	for idx := 0; idx < len(taskCtx.Input.Funcs); idx++ {
+		taskCtx.Input.FuncTask = taskCtx.Input.Funcs[idx]
+		funcTaskKey := util.GetFuncTaskKey(taskCtx.Input.FuncTask)
 
-	// Parse the file containing the Go program
-	fileNode, err := parser.ParseFile(fset, input.FuncTask.Source, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
+		if logic.IsNewFuncTask(taskCtx, funcTaskKey) {
+			funcNodeInfo := logic.GetFuncNodeInfo(taskCtx)
+			newFuncNodeInfo := logic.FilterRelevantNodeInfo(taskCtx, funcNodeInfo)
+			taskCtx.FuncTaskMap[funcTaskKey] = newFuncNodeInfo
+		}
+
+		funcNodeInfo := taskCtx.FuncTaskMap[funcTaskKey]
+		if funcNodeInfo == nil {
+			log.Printf("GetRelevantFuncs FuncTaskMapNotFound %+v", util.JsonString(&funcTaskKey))
+			continue
+		}
+		util.NodeInfoUpdateNode(funcNodeInfo)
+		fmt.Printf("//file://%s\n", input.FuncTask.Source)
+		err := printer.Fprint(os.Stdout, taskCtx.FileSet, funcNodeInfo.Node)
+		if err != nil {
+			log.Printf("GetRelevantFuncs FprintErr %+v", err)
+			return
+		}
+		fmt.Println()
+		fmt.Println()
 	}
 
-	funcDecl := util.GetFunc(fileNode, input.FuncTask.FuncName)
-	nodeInfo := util.GetNodeInfo(funcDecl)
-	taskCtx := model.TaskCtx{
-		Input: input,
-	}
-	newNodeInfo, _ := logic.FilterRelevantNodeInfo(&taskCtx, nodeInfo)
-
-	util.NodeInfoUpdateNode(newNodeInfo)
-	fmt.Printf("//file://%s\n", input.FuncTask.Source)
-	err = printer.Fprint(os.Stdout, fset, newNodeInfo.Node)
+	formattedJSON, err := FormatJSONObject(taskCtx.Input)
 	if err != nil {
-		log.Printf("GetRelevantFunc FprintErr %+v", err)
-		return
+		log.Fatal(err)
+	}
+
+	// Write the formatted JSON to file
+	err = WriteToFile(filePath, formattedJSON)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
-func GetRelevantFuncs(input *model.Input) {
-	for _, fn := range input.Funcs {
-		input.FuncTask = fn
-		GetRelevantFunc(input)
-		fmt.Println()
-		fmt.Println()
+// FormatJSONObject takes an interface{} object, marshals it into JSON, and formats it.
+func FormatJSONObject(obj interface{}) (string, error) {
+	formattedJSON, err := json.MarshalIndent(obj, "", "    ") // 4 spaces for indentation
+	if err != nil {
+		return "", err
 	}
+	return string(formattedJSON), nil
+}
+
+// WriteToFile writes a string to a file.
+func WriteToFile(filename string, data string) error {
+	// Create a file or overwrite if it already exists
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write the data to the file
+	_, err = file.WriteString(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

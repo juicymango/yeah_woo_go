@@ -2,97 +2,103 @@ package logic
 
 import (
 	"go/ast"
+	"go/parser"
+	"go/token"
+	"log"
+	"slices"
 	"strings"
 
 	"github.com/juicymango/yeah_woo_go/model"
 	"github.com/juicymango/yeah_woo_go/util"
 )
 
-func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) (newNodeInfo *model.NodeInfo, isRelevant bool) {
+func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *model.NodeInfo {
 	if nodeInfo == nil {
-		return
-	}
-
-	newNodeInfo = util.CloneNodeInfo(nodeInfo)
-
-	// Ident / SelectorExpr
-	if nodeInfo.Type == "*ast.Ident" || nodeInfo.Type == "*ast.SelectorExpr" {
-		expr := nodeInfo.Node.(ast.Expr)
-		isRelevant = IsTargetVariable(taskCtx, expr)
-		return
-	}
-
-	// Return
-	if nodeInfo.Type == "*ast.ReturnStmt" && taskCtx.Input.FuncTask.ShowReturn {
-		isRelevant = true
-		return
-	}
-	// Break
-	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "break" && taskCtx.Input.FuncTask.ShowBreak {
-		isRelevant = true
-		return
-	}
-	// Continue
-	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "continue" && taskCtx.Input.FuncTask.ShowContinue {
-		isRelevant = true
-		return
-	}
-
-	// BlockStmt
-	if nodeInfo.Type == "*ast.BlockStmt" {
-		newNodeInfo.NodeListFields["List"] = newNodeInfo.NodeListFields["List"][:0]
-		for _, fieldNodeInfo := range nodeInfo.NodeListFields["List"] {
-			fieldNewNodeInfo, fieldIsRelevant := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
-			if fieldIsRelevant {
-				isRelevant = true
-				if fieldNewNodeInfo != nil {
-					newNodeInfo.NodeListFields["List"] = append(newNodeInfo.NodeListFields["List"], fieldNewNodeInfo)
-				}
-			}
-		}
-		return
-	}
-
-	// CaseClause
-	if nodeInfo.Type == "*ast.CaseClause" {
-		newNodeInfo.NodeListFields["Body"] = newNodeInfo.NodeListFields["Body"][:0]
-		for _, fieldNodeInfo := range nodeInfo.NodeListFields["Body"] {
-			fieldNewNodeInfo, fieldIsRelevant := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
-			if fieldIsRelevant {
-				isRelevant = true
-				if fieldNewNodeInfo != nil {
-					newNodeInfo.NodeListFields["Body"] = append(newNodeInfo.NodeListFields["Body"], fieldNewNodeInfo)
-				}
-			} else if fieldNodeInfo.Type == "*ast.ReturnStmt" {
-				newNodeInfo.NodeListFields["Body"] = append(newNodeInfo.NodeListFields["Body"], fieldNewNodeInfo)
-			}
-		}
-		return
+		return nil
 	}
 
 	// default
+	newNodeInfo := util.CloneNodeInfo(nodeInfo)
+	newNodeInfo.RelevantTaskResult = &model.RelevantTaskResult{}
 	for name, fieldNodeInfo := range nodeInfo.NodeFields {
-		fieldNewNodeInfo, fieldIsRelevant := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
-		if fieldIsRelevant {
-			isRelevant = true
+		fieldNewNodeInfo := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
+		if fieldNewNodeInfo == nil {
+			continue
 		}
-		if fieldNewNodeInfo != nil {
-			newNodeInfo.NodeFields[name] = fieldNewNodeInfo
+		newNodeInfo.NodeFields[name] = fieldNewNodeInfo
+		if fieldNewNodeInfo.RelevantTaskResult != nil {
+			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant {
+				newNodeInfo.RelevantTaskResult.IsRelevant = true
+			}
+			if fieldNewNodeInfo.RelevantTaskResult.NotFilterByBlock {
+				newNodeInfo.RelevantTaskResult.NotFilterByBlock = true
+			}
 		}
 	}
 	for name, fieldNodeInfos := range nodeInfo.NodeListFields {
 		for idx, fieldNodeInfo := range fieldNodeInfos {
-			fieldNewNodeInfo, fieldIsRelevant := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
-			if fieldIsRelevant {
-				isRelevant = true
+			fieldNewNodeInfo := FilterRelevantNodeInfo(taskCtx, fieldNodeInfo)
+			if fieldNewNodeInfo == nil {
+				continue
 			}
-			if fieldNewNodeInfo != nil {
-				newNodeInfo.NodeListFields[name][idx] = fieldNewNodeInfo
+			newNodeInfo.NodeListFields[name][idx] = fieldNewNodeInfo
+			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant {
+				newNodeInfo.RelevantTaskResult.IsRelevant = true
+			}
+			if fieldNewNodeInfo.RelevantTaskResult.NotFilterByBlock {
+				newNodeInfo.RelevantTaskResult.NotFilterByBlock = true
 			}
 		}
 	}
 
-	return
+	// Ident / SelectorExpr
+	if nodeInfo.Type == "*ast.Ident" || nodeInfo.Type == "*ast.SelectorExpr" {
+		expr := nodeInfo.Node.(ast.Expr)
+		newNodeInfo.RelevantTaskResult.IsRelevant = IsTargetVariable(taskCtx, expr)
+		return newNodeInfo
+	}
+
+	// Return
+	if nodeInfo.Type == "*ast.ReturnStmt" && taskCtx.Input.FuncTask.ShowReturn {
+		newNodeInfo.RelevantTaskResult.NotFilterByBlock = true
+		return newNodeInfo
+	}
+	// Break
+	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "break" && taskCtx.Input.FuncTask.ShowBreak {
+		newNodeInfo.RelevantTaskResult.NotFilterByBlock = true
+		return newNodeInfo
+	}
+	// Continue
+	if nodeInfo.Type == "*ast.BranchStmt" && nodeInfo.TokenFields["Tok"] == "continue" && taskCtx.Input.FuncTask.ShowContinue {
+		newNodeInfo.RelevantTaskResult.NotFilterByBlock = true
+		return newNodeInfo
+	}
+
+	// BlockStmt / CaseClause
+	if nodeInfo.Type == "*ast.BlockStmt" || nodeInfo.Type == "*ast.CaseClause" {
+		fieldName := "List"
+		if nodeInfo.Type == "*ast.CaseClause" {
+			fieldName = "Body"
+		}
+		newNodeInfo.NodeListFields[fieldName] = slices.DeleteFunc(newNodeInfo.NodeListFields[fieldName], func(fieldNodeInfo *model.NodeInfo) bool {
+			if fieldNodeInfo == nil {
+				return true
+			}
+			if fieldNodeInfo.RelevantTaskResult == nil {
+				return false
+			}
+			return !fieldNodeInfo.RelevantTaskResult.IsRelevant && !fieldNodeInfo.RelevantTaskResult.NotFilterByBlock
+		})
+		return newNodeInfo
+	}
+
+	// CallExpr
+	if nodeInfo.Type == "*ast.CallExpr" {
+		FilterRelevantCallExpr(taskCtx, newNodeInfo)
+		return newNodeInfo
+	}
+
+	return newNodeInfo
 }
 
 func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
@@ -138,4 +144,26 @@ func GetSelectorExprNameParts(expr *ast.SelectorExpr) []string {
 		expr = x
 	}
 	return parts
+}
+
+func GetFuncNodeInfo(taskCtx *model.TaskCtx) *model.NodeInfo {
+	// Create a new token file set which is needed for parsing
+	if taskCtx.FileSet == nil {
+		taskCtx.FileSet = token.NewFileSet()
+	}
+
+	// Parse the file containing the Go program
+	fileNode, err := parser.ParseFile(taskCtx.FileSet, taskCtx.Input.FuncTask.Source, nil, parser.ParseComments)
+	if err != nil {
+		log.Printf("GetFuncNodeInfo ParseFileErr, err:%+v, task:%+v", err, util.JsonString(&taskCtx.Input.FuncTask))
+		return nil
+	}
+
+	funcDecl := util.GetFunc(fileNode, taskCtx.Input.FuncTask.FuncName)
+	if funcDecl == nil {
+		log.Printf("GetFuncNodeInfo GetFuncFail, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
+		return nil
+	}
+	nodeInfo := util.GetNodeInfo(funcDecl)
+	return nodeInfo
 }

@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
+	"maps"
 	"reflect"
+	"slices"
 
 	"github.com/juicymango/yeah_woo_go/model"
 )
@@ -151,4 +153,23 @@ func NodeInfoUpdateNode(nodeInfo *model.NodeInfo) {
 			log.Printf("NodeInfoUpdateNode SetValueToFieldByNameFail NodeType %s, FieldName %s, Err %v", nodeInfo.Type, name, err)
 		}
 	}
+}
+
+func CloneNodeInfo(nodeInfo *model.NodeInfo) *model.NodeInfo {
+	if nodeInfo == nil {
+		return nil
+	}
+	newNodeListFields := make(map[string][]*model.NodeInfo, len(nodeInfo.NodeListFields))
+	for name, nodes := range nodeInfo.NodeListFields {
+		newNodeListFields[name] = slices.Clone(nodes)
+	}
+	newNodeInfo := &model.NodeInfo{
+		Node:           nodeInfo.Node,
+		Type:           nodeInfo.Type,
+		NodeFields:     maps.Clone(nodeInfo.NodeFields),
+		NodeListFields: newNodeListFields,
+		StringFields:   maps.Clone(nodeInfo.StringFields),
+		TokenFields:    maps.Clone(nodeInfo.TokenFields),
+	}
+	return newNodeInfo
 }

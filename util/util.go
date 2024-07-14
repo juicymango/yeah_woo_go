@@ -1,12 +1,16 @@
 package util
 
 import (
+	"encoding/json"
 	"go/ast"
 	"go/printer"
 	"go/token"
-	"maps"
+	"log"
 	"os"
 	"slices"
+	"sort"
+	"strings"
+	"unsafe"
 
 	"github.com/juicymango/yeah_woo_go/model"
 )
@@ -35,21 +39,35 @@ func PrintFunc(fset *token.FileSet, funcDecl *ast.FuncDecl) {
 	}
 }
 
-func CloneNodeInfo(nodeInfo *model.NodeInfo) *model.NodeInfo {
-	if nodeInfo == nil {
-		return nil
+func JsonString(v any) string {
+	jsonBytes, jsonErr := json.Marshal(v)
+	if jsonErr != nil {
+		log.Printf("JsonString MarshalErr %+v", jsonErr)
+		return ""
 	}
-	newNodeListFields := make(map[string][]*model.NodeInfo, len(nodeInfo.NodeListFields))
-	for name, nodes := range nodeInfo.NodeListFields {
-		newNodeListFields[name] = slices.Clone(nodes)
+	return unsafe.String(unsafe.SliceData(jsonBytes), len(jsonBytes))
+}
+
+// StringSliceToKey takes a slice of strings, sorts it, joins the sorted elements with a separator,
+// and returns the result as a string. This string can be used as a map key.
+func StringSliceToKey(slice []string) string {
+	// Make a copy of the slice to avoid modifying the input slice
+	sliceCopy := slices.Clone(slice)
+
+	// Sort the copy of the slice
+	sort.Strings(sliceCopy)
+
+	// Join the sorted elements with a separator
+	return strings.Join(sliceCopy, ",")
+}
+
+func GetFuncTaskKey(funcTask model.FuncTask) model.FuncTaskKey {
+	return model.FuncTaskKey{
+		Source:       funcTask.Source,
+		FuncName:     funcTask.FuncName,
+		VarNames:     StringSliceToKey(funcTask.VarNames),
+		ShowReturn:   funcTask.ShowReturn,
+		ShowBreak:    funcTask.ShowBreak,
+		ShowContinue: funcTask.ShowContinue,
 	}
-	newNodeInfo := &model.NodeInfo{
-		Node:           nodeInfo.Node,
-		Type:           nodeInfo.Type,
-		NodeFields:     maps.Clone(nodeInfo.NodeFields),
-		NodeListFields: newNodeListFields,
-		StringFields:   maps.Clone(nodeInfo.StringFields),
-		TokenFields:    maps.Clone(nodeInfo.TokenFields),
-	}
-	return newNodeInfo
 }
