@@ -104,8 +104,12 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 			continue
 		}
 		util.NodeInfoUpdateNode(funcNodeInfo)
+		formattedJSON, err := FormatJSONObject(taskCtx.Input.FuncTask)
+		if err == nil {
+			fmt.Printf("/*\n%s\n*/\n", formattedJSON)
+		}
 		fmt.Printf("//file://%s\n", input.FuncTask.Source)
-		err := printer.Fprint(os.Stdout, taskCtx.FileSet, funcNodeInfo.Node)
+		err = printer.Fprint(os.Stdout, taskCtx.FileSet, funcNodeInfo.Node)
 		if err != nil {
 			log.Printf("GetRelevantFuncs FprintErr %+v", err)
 			return
@@ -114,16 +118,18 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		fmt.Println()
 	}
 
-	formattedJSON, err := FormatJSONObject(taskCtx.Input)
-	if err != nil {
-		log.Fatal(err)
-	}
+	/*
+		formattedJSON, err := FormatJSONObject(taskCtx.Input)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	// Write the formatted JSON to file
-	err = WriteToFile(filePath, formattedJSON)
-	if err != nil {
-		log.Fatal(err)
-	}
+		// Write the formatted JSON to file
+		err = WriteToFile(filePath, formattedJSON)
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
 }
 
 // FormatJSONObject takes an interface{} object, marshals it into JSON, and formats it.

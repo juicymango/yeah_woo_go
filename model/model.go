@@ -18,6 +18,7 @@ type FuncTask struct {
 	ShowReturn   bool     `json:"show_return"`
 	ShowBreak    bool     `json:"show_break"`
 	ShowContinue bool     `json:"show_continue"`
+	ExactMatch   bool     `json:"exact_match"`
 }
 
 type FuncTaskKey struct {
@@ -33,6 +34,7 @@ type TaskCtx struct {
 	Input       *Input
 	FuncTaskMap map[FuncTaskKey]*NodeInfo
 	FileSet     *token.FileSet
+	FileInfoMap map[string]*FileInfo
 }
 
 type NodeInfo struct {
@@ -48,4 +50,16 @@ type NodeInfo struct {
 type RelevantTaskResult struct {
 	IsRelevant       bool
 	NotFilterByBlock bool
+}
+
+type FileInfo struct {
+	NodeInfo  *NodeInfo
+	Package   string
+	FuncMap   map[FuncKey]*NodeInfo
+	ImportMap map[string]string
+}
+
+type FuncKey struct {
+	RecvTypes string
+	Name      string
 }

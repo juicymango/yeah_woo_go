@@ -2,17 +2,25 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/printer"
 	"go/token"
 	"log"
 	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
 	"unsafe"
 
 	"github.com/juicymango/yeah_woo_go/model"
+)
+
+var (
+	versionRegexp *regexp.Regexp = regexp.MustCompile(`^v\d+(\.\d+)?`)
+	nameRegexp    *regexp.Regexp = regexp.MustCompile(`[a-zA-Z0-9_]+$`)
 )
 
 // GetFunc searches for a function declaration with the given name in the specified file's AST.
@@ -70,4 +78,47 @@ func GetFuncTaskKey(funcTask model.FuncTask) model.FuncTaskKey {
 		ShowBreak:    funcTask.ShowBreak,
 		ShowContinue: funcTask.ShowContinue,
 	}
+}
+
+func GetPackageNameFromPath(packagePath string) string {
+	// Split the path into segments based on '/'
+	segments := strings.Split(packagePath, "/")
+	lastSegment := segments[len(segments)-1]
+
+	// Handle versioning gracefully, ignoring it to focus on the actual package name
+	if versionRegexp.MatchString(lastSegment) && len(segments) > 1 {
+		// If the last segment is a version, consider the previous segment as the package name segment
+		lastSegment = segments[len(segments)-2]
+	}
+
+	// Extract the longest suffix not containing special characters
+	match := nameRegexp.FindStringSubmatch(lastSegment)
+	if len(match) > 0 {
+		return match[0]
+	}
+
+	// Default return if no match found (should not usually happen given the inputs)
+	return ""
+}
+
+// RemoveQuotesIfPresent checks if the input string starts and ends with '"'
+// and returns the string without these characters if present.
+func RemoveQuotesIfPresent(input string) string {
+	if len(input) >= 2 && strings.HasPrefix(input, `"`) && strings.HasSuffix(input, `"`) {
+		return input[1 : len(input)-1]
+	}
+	return input
+}
+
+// GetAbsoluteImportPath returns the absolute path of a given import path.
+func GetAbsoluteImportPath(importPath string) (string, error) {
+	// Get GOPATH environment variable
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		return "", fmt.Errorf("GOPATH environment variable is not set")
+	}
+
+	// Construct the absolute path
+	absolutePath := filepath.Join(gopath, "src", importPath)
+	return absolutePath, nil
 }

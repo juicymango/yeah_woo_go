@@ -113,8 +113,11 @@ func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
 		return false
 	}
 	for _, varName := range taskCtx.Input.FuncTask.VarNames {
-		match := true
 		varNameParts := strings.Split(varName, ".")
+		if taskCtx.Input.FuncTask.ExactMatch && len(varNameParts) != len(nameParts) {
+			continue
+		}
+		match := true
 		for i := 0; i < len(varNameParts) && i < len(nameParts); i++ {
 			if nameParts[i] != varNameParts[i] {
 				match = false
@@ -147,6 +150,27 @@ func GetSelectorExprNameParts(expr *ast.SelectorExpr) []string {
 }
 
 func GetFuncNodeInfo(taskCtx *model.TaskCtx) *model.NodeInfo {
+	fileInfo := GetFileInfo(taskCtx)
+	if fileInfo == nil {
+		log.Printf("GetFuncNodeInfo fileInfo nil, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
+		return nil
+	}
+	funcNode := fileInfo.FuncMap[model.FuncKey{Name: taskCtx.Input.FuncTask.FuncName}]
+	if funcNode == nil {
+		log.Printf("GetFuncNodeInfo funcNode nil, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
+		return nil
+	}
+	return funcNode
+}
+
+func GetFileInfo(taskCtx *model.TaskCtx) *model.FileInfo {
+	if taskCtx.FileInfoMap[taskCtx.Input.FuncTask.Source] != nil {
+		return taskCtx.FileInfoMap[taskCtx.Input.FuncTask.Source]
+	}
+
+	if taskCtx.FileInfoMap == nil {
+		taskCtx.FileInfoMap = make(map[string]*model.FileInfo)
+	}
 	// Create a new token file set which is needed for parsing
 	if taskCtx.FileSet == nil {
 		taskCtx.FileSet = token.NewFileSet()
@@ -155,15 +179,64 @@ func GetFuncNodeInfo(taskCtx *model.TaskCtx) *model.NodeInfo {
 	// Parse the file containing the Go program
 	fileNode, err := parser.ParseFile(taskCtx.FileSet, taskCtx.Input.FuncTask.Source, nil, parser.ParseComments)
 	if err != nil {
-		log.Printf("GetFuncNodeInfo ParseFileErr, err:%+v, task:%+v", err, util.JsonString(&taskCtx.Input.FuncTask))
+		log.Printf("GetFileInfo ParseFileErr, err:%+v, task:%+v", err, util.JsonString(&taskCtx.Input.FuncTask))
 		return nil
 	}
+	nodeInfo := util.GetNodeInfo(fileNode)
+	fileInfo := &model.FileInfo{
+		NodeInfo: nodeInfo,
+		Package:  nodeInfo.NodeFields["Name"].StringFields["Name"],
+	}
+	taskCtx.FileInfoMap[taskCtx.Input.FuncTask.Source] = fileInfo
 
-	funcDecl := util.GetFunc(fileNode, taskCtx.Input.FuncTask.FuncName)
-	if funcDecl == nil {
-		log.Printf("GetFuncNodeInfo GetFuncFail, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
-		return nil
+	GetFileInfoFuncMap(taskCtx, fileInfo)
+	GetFileInfoImportMap(taskCtx, fileInfo)
+	return fileInfo
+}
+
+func GetFileInfoFuncMap(taskCtx *model.TaskCtx, fileInfo *model.FileInfo) {
+	decls, ok := fileInfo.NodeInfo.NodeListFields["Decls"]
+	if !ok {
+		return
 	}
-	nodeInfo := util.GetNodeInfo(funcDecl)
-	return nodeInfo
+	fileInfo.FuncMap = make(map[model.FuncKey]*model.NodeInfo)
+	for _, decl := range decls {
+		if decl.Type != "*ast.FuncDecl" {
+			continue
+		}
+		funcName := decl.NodeFields["Name"].StringFields["Name"]
+		recvTypes := make([]string, 0)
+		if decl.NodeFields["Recv"] != nil {
+			for _, recv := range decl.NodeFields["Recv"].NodeListFields["List"] {
+				if recv.NodeFields["Type"].Type != "*ast.Ident" {
+					log.Printf("GetFileInfo recv.NodeFields[Type].Type != *ast.Ident, recv:%+v", util.JsonString(recv))
+					continue
+				}
+				recvTypes = append(recvTypes, recv.NodeFields["Type"].StringFields["Name"])
+			}
+		}
+		recvTypesStr := strings.Join(recvTypes, ",")
+		fileInfo.FuncMap[model.FuncKey{
+			RecvTypes: recvTypesStr,
+			Name:      funcName,
+		}] = decl
+	}
+}
+
+func GetFileInfoImportMap(taskCtx *model.TaskCtx, fileInfo *model.FileInfo) {
+	imports, ok := fileInfo.NodeInfo.NodeListFields["Imports"]
+	if !ok {
+		return
+	}
+	fileInfo.ImportMap = make(map[string]string)
+	for _, imp := range imports {
+		if imp.NodeFields["Name"] != nil {
+			fileInfo.ImportMap[imp.NodeFields["Name"].StringFields["Name"]] = util.RemoveQuotesIfPresent(imp.NodeFields["Path"].StringFields["Value"])
+			continue
+		}
+		path := util.RemoveQuotesIfPresent(imp.NodeFields["Path"].StringFields["Value"])
+		name := util.GetPackageNameFromPath(path)
+		fileInfo.ImportMap[name] = path
+	}
+	log.Printf("GetFileInfoImportMap ImportMap:%+v", fileInfo.ImportMap)
 }
