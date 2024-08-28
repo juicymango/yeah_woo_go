@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"slices"
 
 	"github.com/juicymango/yeah_woo_go/model"
 	"github.com/juicymango/yeah_woo_go/util"
@@ -63,34 +62,30 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 	for _, filePath := range targetFilePaths {
 		// new FuncTask
 		taskCtx.Input.FuncTask.Source = filePath
-		funcNodeInfo := GetFuncNodeInfo(taskCtx)
-		relevantFieldNames := GetRelevantFuncFieldNames(taskCtx, nodeInfo, funcNodeInfo)
+
+		result := GetFuncTaskResult(taskCtx)
+		relevantFieldNames := GetRelevantFuncFieldNames(taskCtx, nodeInfo, result.FuncNodeInfo)
 		if len(relevantFieldNames) > 0 {
-			taskCtx.Input.FuncTask.VarNames = slices.Clone(currentFuncTask.VarNames)
-			for _, name := range relevantFieldNames {
-				if !slices.Contains(taskCtx.Input.FuncTask.VarNames, name) {
-					taskCtx.Input.FuncTask.VarNames = append(taskCtx.Input.FuncTask.VarNames, name)
-				}
-			}
+			taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, relevantFieldNames)
 		}
 		log.Printf("FilterRelevantCallExpr GrepResult, dir:%s, targetString:%s, targetFilePaths:%+v", dir, targetString, targetFilePaths)
 
-		// FuncTaskMap
-		funcTaskKey := util.GetFuncTaskKey(taskCtx.Input.FuncTask)
-		if !IsNewFuncTask(taskCtx, funcTaskKey) {
+		if result.FuncNodeInfo == nil {
+			continue
+		}
+		if !CheckNeedRunAndMergeVarNames(taskCtx, result) {
 			continue
 		}
 
 		// filter
-		newFuncNodeInfo := FilterRelevantNodeInfo(taskCtx, funcNodeInfo)
+		newFuncNodeInfo := FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
+		result.FilterRelevantNodeInfo = newFuncNodeInfo
 		if newFuncNodeInfo != nil && newFuncNodeInfo.RelevantTaskResult != nil && nodeInfo.RelevantTaskResult != nil {
 			log.Printf("FilterRelevantCallExpr NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(newFuncNodeInfo.RelevantTaskResult))
 			if newFuncNodeInfo.RelevantTaskResult.IsRelevant {
 				nodeInfo.RelevantTaskResult.IsRelevant = true
-				taskCtx.Input.Funcs = append(taskCtx.Input.Funcs, taskCtx.Input.FuncTask)
 			}
 		}
-		taskCtx.FuncTaskMap[funcTaskKey] = newFuncNodeInfo
 	}
 	taskCtx.Input.FuncTask = currentFuncTask
 }
@@ -112,18 +107,49 @@ func GetRelevantFuncFieldNames(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo,
 	return varNames
 }
 
-func IsNewFuncTask(taskCtx *model.TaskCtx, funcTaskKey model.FuncTaskKey) bool {
-	_, ok := taskCtx.FuncTaskMap[funcTaskKey]
-	if ok {
-		log.Printf("IsNewFuncTask Exists FuncTask, FuncTask:%+v", util.JsonString(taskCtx.Input.FuncTask))
-		return false
+func GetFuncTaskResult(taskCtx *model.TaskCtx) *model.FuncTaskResult {
+	if taskCtx.FuncTaskResults == nil {
+		taskCtx.FuncTaskResults = make([]*model.FuncTaskResult, 0)
 	}
 	if taskCtx.FuncTaskMap == nil {
-		taskCtx.FuncTaskMap = make(map[model.FuncTaskKey]*model.NodeInfo)
+		taskCtx.FuncTaskMap = make(map[model.FuncTaskKey]*model.FuncTaskResult)
 	}
-	taskCtx.FuncTaskMap[funcTaskKey] = nil
-	log.Printf("IsNewFuncTask New FuncTask, FuncTask:%+v", util.JsonString(taskCtx.Input.FuncTask))
-	return true
+	funcTaskKey := util.GetFuncTaskKey(taskCtx.Input.FuncTask)
+	result := taskCtx.FuncTaskMap[funcTaskKey]
+	if result == nil {
+		result = &model.FuncTaskResult{
+			FuncNodeInfo: GetFuncNodeInfo(taskCtx),
+		}
+		if result.FuncNodeInfo == nil {
+			log.Printf("GetFuncTaskResult FuncNodeInfoNil, funcTaskKey:%+v", util.JsonString(funcTaskKey))
+		}
+		taskCtx.FuncTaskMap[funcTaskKey] = result
+		taskCtx.FuncTaskResults = append(taskCtx.FuncTaskResults, result)
+		log.Printf("GetFuncTaskResult New FuncTask, funcTaskKey:%+v", util.JsonString(funcTaskKey))
+	}
+	return result
+}
+
+func CheckNeedRunAndMergeVarNames(taskCtx *model.TaskCtx, result *model.FuncTaskResult) bool {
+	if result.FuncNodeInfo == nil {
+		return false
+	}
+	if !result.Started {
+		result.Started = true
+		result.FuncTask = taskCtx.Input.FuncTask
+		log.Printf("CheckNeedRunAndMergeVarNames NotStarted, FuncTask:%+v", util.JsonString(taskCtx.Input.FuncTask))
+		return true
+	}
+	newVarNames := util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, result.FuncTask.VarNames)
+	if len(newVarNames) > len(result.FuncTask.VarNames) {
+		log.Printf("CheckNeedRunAndMergeVarNames NewVarNames, FuncTask:%+v, newVarNames:%v, oldVarNames:%v", util.JsonString(taskCtx.Input.FuncTask), newVarNames, result.FuncTask.VarNames)
+		result.FuncTask.VarNames = newVarNames
+		taskCtx.Input.FuncTask.VarNames = newVarNames
+		result.FilterRelevantNodeInfo = nil
+		result.Started = true
+		return true
+	}
+	return false
 }
 
 func FilterRelevantCallExprOtherFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo, fun *model.NodeInfo) bool {

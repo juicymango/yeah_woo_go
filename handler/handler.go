@@ -84,35 +84,39 @@ func GetFileNodeInfo(filePath string, input *model.Input) {
 
 func GetRelevantFuncs(filePath string, input *model.Input) {
 	taskCtx := &model.TaskCtx{
-		Input:       input,
-		FuncTaskMap: make(map[model.FuncTaskKey]*model.NodeInfo),
-		FileSet:     token.NewFileSet(),
+		Input:   input,
+		FileSet: token.NewFileSet(),
 	}
 	for idx := 0; idx < len(taskCtx.Input.Funcs); idx++ {
 		taskCtx.Input.FuncTask = taskCtx.Input.Funcs[idx]
-		funcTaskKey := util.GetFuncTaskKey(taskCtx.Input.FuncTask)
-
-		if logic.IsNewFuncTask(taskCtx, funcTaskKey) {
-			funcNodeInfo := logic.GetFuncNodeInfo(taskCtx)
-			newFuncNodeInfo := logic.FilterRelevantNodeInfo(taskCtx, funcNodeInfo)
-			taskCtx.FuncTaskMap[funcTaskKey] = newFuncNodeInfo
-		}
-
-		funcNodeInfo := taskCtx.FuncTaskMap[funcTaskKey]
-		if funcNodeInfo == nil {
-			log.Printf("GetRelevantFuncs FuncTaskMapNotFound %+v", util.JsonString(&funcTaskKey))
+		result := logic.GetFuncTaskResult(taskCtx)
+		result.IsFromInput = true
+		if result.FuncNodeInfo == nil {
+			log.Printf("GetRelevantFuncs FuncNodeInfoNil %+v", util.JsonString(&result.FuncTask))
 			continue
 		}
-		util.NodeInfoUpdateNode(funcNodeInfo)
-		formattedJSON, err := FormatJSONObject(taskCtx.Input.FuncTask)
+		if !logic.CheckNeedRunAndMergeVarNames(taskCtx, result) {
+			continue
+		}
+		result.FilterRelevantNodeInfo = logic.FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
+	}
+
+	for _, result := range taskCtx.FuncTaskResults {
+		if !result.IsFromInput && (result.FilterRelevantNodeInfo == nil || !result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant) {
+			continue
+		}
+		formattedJSON, err := FormatJSONObject(result.FuncTask)
 		if err == nil {
 			fmt.Printf("/*\n%s\n*/\n", formattedJSON)
 		}
-		fmt.Printf("//file://%s\n", input.FuncTask.Source)
-		err = printer.Fprint(os.Stdout, taskCtx.FileSet, funcNodeInfo.Node)
+		fmt.Printf("//file://%s\n", result.FuncTask.Source)
+		if result.FilterRelevantNodeInfo == nil {
+			continue
+		}
+		util.NodeInfoUpdateNode(result.FilterRelevantNodeInfo)
+		err = printer.Fprint(os.Stdout, taskCtx.FileSet, result.FilterRelevantNodeInfo.Node)
 		if err != nil {
 			log.Printf("GetRelevantFuncs FprintErr %+v", err)
-			return
 		}
 		fmt.Println()
 		fmt.Println()

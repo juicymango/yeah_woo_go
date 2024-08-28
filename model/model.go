@@ -22,19 +22,24 @@ type FuncTask struct {
 }
 
 type FuncTaskKey struct {
-	Source       string `json:"source"`
-	FuncName     string `json:"func_name"`
-	VarNames     string `json:"var_names"`
-	ShowReturn   bool   `json:"show_return"`
-	ShowBreak    bool   `json:"show_break"`
-	ShowContinue bool   `json:"show_continue"`
+	Source   string `json:"source"`
+	FuncName string `json:"func_name"`
+}
+
+type FuncTaskResult struct {
+	FuncTask               FuncTask
+	FuncNodeInfo           *NodeInfo
+	FilterRelevantNodeInfo *NodeInfo
+	IsFromInput            bool
+	Started                bool
 }
 
 type TaskCtx struct {
-	Input       *Input
-	FuncTaskMap map[FuncTaskKey]*NodeInfo
-	FileSet     *token.FileSet
-	FileInfoMap map[string]*FileInfo
+	Input           *Input
+	FuncTaskResults []*FuncTaskResult
+	FuncTaskMap     map[FuncTaskKey]*FuncTaskResult
+	FileSet         *token.FileSet
+	FileInfoMap     map[string]*FileInfo
 }
 
 type NodeInfo struct {

@@ -69,14 +69,36 @@ func StringSliceToKey(slice []string) string {
 	return strings.Join(sliceCopy, ",")
 }
 
+func MergeAndDeduplicate(slice1, slice2 []string) []string {
+	// Create a map to keep track of unique elements
+	uniqueElements := make(map[string]bool)
+
+	// Add elements from the first slice to the map
+	for _, elem := range slice1 {
+		uniqueElements[elem] = true
+	}
+
+	// Add elements from the second slice to the map
+	for _, elem := range slice2 {
+		uniqueElements[elem] = true
+	}
+
+	// Create a new slice to hold the unique elements
+	mergedSlice := make([]string, 0, len(uniqueElements))
+	for elem := range uniqueElements {
+		mergedSlice = append(mergedSlice, elem)
+	}
+
+	// Sort the merged slice
+	sort.Strings(mergedSlice)
+
+	return mergedSlice
+}
+
 func GetFuncTaskKey(funcTask model.FuncTask) model.FuncTaskKey {
 	return model.FuncTaskKey{
-		Source:       funcTask.Source,
-		FuncName:     funcTask.FuncName,
-		VarNames:     StringSliceToKey(funcTask.VarNames),
-		ShowReturn:   funcTask.ShowReturn,
-		ShowBreak:    funcTask.ShowBreak,
-		ShowContinue: funcTask.ShowContinue,
+		Source:   funcTask.Source,
+		FuncName: funcTask.FuncName,
 	}
 }
 
