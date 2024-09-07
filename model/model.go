@@ -3,6 +3,7 @@ package model
 import (
 	"go/ast"
 	"go/token"
+	"time"
 )
 
 type Input struct {
@@ -19,6 +20,8 @@ type FuncTask struct {
 	ShowBreak    bool     `json:"show_break"`
 	ShowContinue bool     `json:"show_continue"`
 	ExactMatch   bool     `json:"exact_match"`
+	EnableCall   bool     `json:"enable_call"`
+	FarawayMatch bool     `json:"faraway_match"`
 }
 
 type FuncTaskKey struct {
@@ -67,4 +70,11 @@ type FileInfo struct {
 type FuncKey struct {
 	RecvTypes string
 	Name      string
+}
+
+type Metrics struct {
+	Count       int           `json:"count"`
+	TotalTime   time.Duration `json:"-"`
+	TotalTimeMS int64         `json:"total_time_ms"`
+	AvgTimeMS   float64       `json:"avg_time_ms"`
 }

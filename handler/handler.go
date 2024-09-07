@@ -6,7 +6,6 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -17,7 +16,7 @@ import (
 
 func Handle(filePath string) {
 	// Read the JSON file from the provided path.
-	fileContent, err := ioutil.ReadFile(filePath)
+	fileContent, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Fatalf("Error reading file: %v", err)
 	}

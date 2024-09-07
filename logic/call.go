@@ -65,24 +65,25 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 
 		result := GetFuncTaskResult(taskCtx)
 		relevantFieldNames := GetRelevantFuncFieldNames(taskCtx, nodeInfo, result.FuncNodeInfo)
+		if !taskCtx.Input.FuncTask.FarawayMatch {
+			taskCtx.Input.FuncTask.VarNames = nil
+		}
 		if len(relevantFieldNames) > 0 {
 			taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, relevantFieldNames)
 		}
 		log.Printf("FilterRelevantCallExpr GrepResult, dir:%s, targetString:%s, targetFilePaths:%+v", dir, targetString, targetFilePaths)
-
+		if len(taskCtx.Input.FuncTask.VarNames) == 0 {
+			continue
+		}
 		if result.FuncNodeInfo == nil {
 			continue
 		}
-		if !CheckNeedRunAndMergeVarNames(taskCtx, result) {
-			continue
+		if CheckNeedRunAndMergeVarNames(taskCtx, result) {
+			result.FilterRelevantNodeInfo = FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
 		}
-
-		// filter
-		newFuncNodeInfo := FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
-		result.FilterRelevantNodeInfo = newFuncNodeInfo
-		if newFuncNodeInfo != nil && newFuncNodeInfo.RelevantTaskResult != nil && nodeInfo.RelevantTaskResult != nil {
-			log.Printf("FilterRelevantCallExpr NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(newFuncNodeInfo.RelevantTaskResult))
-			if newFuncNodeInfo.RelevantTaskResult.IsRelevant {
+		if result.FilterRelevantNodeInfo != nil && result.FilterRelevantNodeInfo.RelevantTaskResult != nil && nodeInfo.RelevantTaskResult != nil {
+			log.Printf("FilterRelevantCallExpr NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(result.FilterRelevantNodeInfo.RelevantTaskResult))
+			if result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant {
 				nodeInfo.RelevantTaskResult.IsRelevant = true
 			}
 		}

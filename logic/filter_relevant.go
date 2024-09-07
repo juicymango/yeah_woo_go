@@ -93,7 +93,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 	}
 
 	// CallExpr
-	if nodeInfo.Type == "*ast.CallExpr" {
+	if nodeInfo.Type == "*ast.CallExpr" && taskCtx.Input.FuncTask.EnableCall {
 		FilterRelevantCallExpr(taskCtx, newNodeInfo)
 		return newNodeInfo
 	}
