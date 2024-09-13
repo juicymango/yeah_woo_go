@@ -8,25 +8,28 @@ import (
 
 type Input struct {
 	Method   string     `json:"method"`
-	FuncTask FuncTask   `json:"func_task"`
+	FuncTask FuncTask   `json:"-"`
 	Funcs    []FuncTask `json:"funcs"`
 }
 
 type FuncTask struct {
-	Source       string   `json:"source"`
-	FuncName     string   `json:"func_name"`
-	VarNames     []string `json:"var_names"`
-	ShowReturn   bool     `json:"show_return"`
-	ShowBreak    bool     `json:"show_break"`
-	ShowContinue bool     `json:"show_continue"`
-	ExactMatch   bool     `json:"exact_match"`
-	EnableCall   bool     `json:"enable_call"`
-	FarawayMatch bool     `json:"faraway_match"`
+	Source           string   `json:"source"`
+	RecvTypes        string   `json:"recv_types"` // seperated by ","
+	FuncName         string   `json:"func_name"`
+	VarNames         []string `json:"var_names"`
+	ShowReturn       bool     `json:"show_return"`
+	ShowBreak        bool     `json:"show_break"`
+	ShowContinue     bool     `json:"show_continue"`
+	ExactMatch       bool     `json:"exact_match"`
+	EnableCall       bool     `json:"enable_call"`
+	FarawayMatch     bool     `json:"faraway_match"`
+	OnlyRelevantFunc bool     `json:"only_relevant_func"`
 }
 
 type FuncTaskKey struct {
-	Source   string `json:"source"`
-	FuncName string `json:"func_name"`
+	Source    string `json:"source"`
+	RecvTypes string `json:"recv_types"`
+	FuncName  string `json:"func_name"`
 }
 
 type FuncTaskResult struct {

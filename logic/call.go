@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"slices"
 
 	"github.com/juicymango/yeah_woo_go/model"
 	"github.com/juicymango/yeah_woo_go/util"
@@ -46,6 +47,10 @@ func FilterRelevantCallExprLocalFunc(taskCtx *model.TaskCtx, nodeInfo *model.Nod
 }
 
 func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo, dir string, funcName string) {
+	isFunNameRelevant := slices.Contains(taskCtx.Input.FuncTask.VarNames, funcName)
+	if !isFunNameRelevant && taskCtx.Input.FuncTask.OnlyRelevantFunc {
+		return
+	}
 	targetString := fmt.Sprintf("func %s(", funcName)
 	targetFilePaths, err := util.Grep(dir, targetString)
 	if err != nil {
@@ -59,12 +64,16 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 
 	currentFuncTask := taskCtx.Input.FuncTask
 	taskCtx.Input.FuncTask.FuncName = funcName
+	taskCtx.Input.FuncTask.RecvTypes = ""
 	for _, filePath := range targetFilePaths {
 		// new FuncTask
 		taskCtx.Input.FuncTask.Source = filePath
 
 		result := GetFuncTaskResult(taskCtx)
 		relevantFieldNames := GetRelevantFuncFieldNames(taskCtx, nodeInfo, result.FuncNodeInfo)
+		if taskCtx.Input.FuncTask.OnlyRelevantFunc {
+			relevantFieldNames = nil
+		}
 		if !taskCtx.Input.FuncTask.FarawayMatch {
 			taskCtx.Input.FuncTask.VarNames = nil
 		}
@@ -72,7 +81,7 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 			taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, relevantFieldNames)
 		}
 		log.Printf("FilterRelevantCallExpr GrepResult, dir:%s, targetString:%s, targetFilePaths:%+v", dir, targetString, targetFilePaths)
-		if len(taskCtx.Input.FuncTask.VarNames) == 0 {
+		if len(taskCtx.Input.FuncTask.VarNames) == 0 && !isFunNameRelevant {
 			continue
 		}
 		if result.FuncNodeInfo == nil {
@@ -82,6 +91,9 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 			result.FilterRelevantNodeInfo = FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
 		}
 		if result.FilterRelevantNodeInfo != nil && result.FilterRelevantNodeInfo.RelevantTaskResult != nil && nodeInfo.RelevantTaskResult != nil {
+			if isFunNameRelevant {
+				result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant = true
+			}
 			log.Printf("FilterRelevantCallExpr NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(result.FilterRelevantNodeInfo.RelevantTaskResult))
 			if result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant {
 				nodeInfo.RelevantTaskResult.IsRelevant = true
@@ -165,6 +177,10 @@ func FilterRelevantCallExprOtherFunc(taskCtx *model.TaskCtx, nodeInfo *model.Nod
 	}
 	importPath := fileInfo.ImportMap[prefix]
 	if importPath == "" {
+		return false
+	}
+	// skip std TODO: support e.g. encoding/json
+	if importPath == prefix {
 		return false
 	}
 	dir, err := util.GetAbsoluteImportPath(importPath)

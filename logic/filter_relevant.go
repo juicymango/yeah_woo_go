@@ -155,7 +155,10 @@ func GetFuncNodeInfo(taskCtx *model.TaskCtx) *model.NodeInfo {
 		log.Printf("GetFuncNodeInfo fileInfo nil, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
 		return nil
 	}
-	funcNode := fileInfo.FuncMap[model.FuncKey{Name: taskCtx.Input.FuncTask.FuncName}]
+	funcNode := fileInfo.FuncMap[model.FuncKey{
+		RecvTypes: taskCtx.Input.FuncTask.RecvTypes,
+		Name:      taskCtx.Input.FuncTask.FuncName,
+	}]
 	if funcNode == nil {
 		log.Printf("GetFuncNodeInfo funcNode nil, task:%+v", util.JsonString(&taskCtx.Input.FuncTask))
 		return nil
@@ -208,11 +211,22 @@ func GetFileInfoFuncMap(taskCtx *model.TaskCtx, fileInfo *model.FileInfo) {
 		recvTypes := make([]string, 0)
 		if decl.NodeFields["Recv"] != nil {
 			for _, recv := range decl.NodeFields["Recv"].NodeListFields["List"] {
-				if recv.NodeFields["Type"].Type != "*ast.Ident" {
-					log.Printf("GetFileInfo recv.NodeFields[Type].Type != *ast.Ident, recv:%+v", util.JsonString(recv))
+				/*
+					if recv.NodeFields["Type"].Type == "*ast.Ident" {
+						recvTypes = append(recvTypes, recv.NodeFields["Type"].StringFields["Name"])
+						continue
+					}
+					if recv.NodeFields["Type"].Type == "*ast.StarExpr" && recv.NodeFields["Type"].NodeFields["X"].Type == "*ast.Ident" {
+						recvTypes = append(recvTypes, "*"+recv.NodeFields["Type"].NodeFields["X"].StringFields["Name"])
+						continue
+					}
+				*/
+				recvType, err := util.FprintToString(taskCtx.FileSet, recv.NodeFields["Type"].Node)
+				if err != nil {
+					log.Printf("GetFileInfo FprintToStringFail, err:%+v, recv:%+v", err, util.JsonString(recv))
 					continue
 				}
-				recvTypes = append(recvTypes, recv.NodeFields["Type"].StringFields["Name"])
+				recvTypes = append(recvTypes, recvType)
 			}
 		}
 		recvTypesStr := strings.Join(recvTypes, ",")

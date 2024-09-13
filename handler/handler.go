@@ -100,10 +100,12 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		result.FilterRelevantNodeInfo = logic.FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
 	}
 
+	taskCtx.Input.Funcs = taskCtx.Input.Funcs[:0]
 	for _, result := range taskCtx.FuncTaskResults {
 		if !result.IsFromInput && (result.FilterRelevantNodeInfo == nil || !result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant) {
 			continue
 		}
+		taskCtx.Input.Funcs = append(taskCtx.Input.Funcs, result.FuncTask)
 		formattedJSON, err := FormatJSONObject(result.FuncTask)
 		if err == nil {
 			fmt.Printf("/*\n%s\n*/\n", formattedJSON)
@@ -121,18 +123,17 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		fmt.Println()
 	}
 
-	/*
-		formattedJSON, err := FormatJSONObject(taskCtx.Input)
-		if err != nil {
-			log.Fatal(err)
-		}
+	formattedJSON, err := FormatJSONObject(taskCtx.Input)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-		// Write the formatted JSON to file
-		err = WriteToFile(filePath, formattedJSON)
-		if err != nil {
-			log.Fatal(err)
-		}
-	*/
+	// Write the formatted JSON to file
+	err = WriteToFile(filePath, formattedJSON)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 // FormatJSONObject takes an interface{} object, marshals it into JSON, and formats it.

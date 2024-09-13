@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/ast"
@@ -45,6 +46,17 @@ func PrintFunc(fset *token.FileSet, funcDecl *ast.FuncDecl) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// FprintToString uses printer.Fprint to print a Go syntax tree to a string
+func FprintToString(fset *token.FileSet, node interface{}) (string, error) {
+	var buf bytes.Buffer
+	// Use printer.Fprint to write the node to the buffer
+	err := printer.Fprint(&buf, token.NewFileSet(), node)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func JsonString(v any) string {
@@ -97,8 +109,9 @@ func MergeAndDeduplicate(slice1, slice2 []string) []string {
 
 func GetFuncTaskKey(funcTask model.FuncTask) model.FuncTaskKey {
 	return model.FuncTaskKey{
-		Source:   funcTask.Source,
-		FuncName: funcTask.FuncName,
+		Source:    funcTask.Source,
+		RecvTypes: funcTask.RecvTypes,
+		FuncName:  funcTask.FuncName,
 	}
 }
 
