@@ -16,7 +16,10 @@ type FuncTask struct {
 	Source           string   `json:"source"`
 	RecvTypes        string   `json:"recv_types"` // seperated by ","
 	FuncName         string   `json:"func_name"`
+	Comments         []string `json:"comments"`
 	VarNames         []string `json:"var_names"`
+	FuncCalls        []string `json:"func_calls"`    // "recv|a.F"
+	ExtraImports     []string `json:"extra_imports"` // "name|path"
 	ShowReturn       bool     `json:"show_return"`
 	ShowBreak        bool     `json:"show_break"`
 	ShowContinue     bool     `json:"show_continue"`

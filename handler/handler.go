@@ -90,10 +90,29 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		taskCtx.Input.FuncTask = taskCtx.Input.Funcs[idx]
 		result := logic.GetFuncTaskResult(taskCtx)
 		result.IsFromInput = true
+	}
+	for idx := 0; idx < len(taskCtx.Input.Funcs); idx++ {
+		taskCtx.Input.FuncTask = taskCtx.Input.Funcs[idx]
+		result := logic.GetFuncTaskResult(taskCtx)
 		if result.FuncNodeInfo == nil {
 			log.Printf("GetRelevantFuncs FuncNodeInfoNil %+v", util.JsonString(&result.FuncTask))
 			continue
 		}
+
+		funcCallNames := make([]string, 0, len(taskCtx.Input.FuncTask.FuncCalls))
+		for _, funcCall := range taskCtx.Input.FuncTask.FuncCalls {
+			_, pkg, funcName, err := util.ParseFuncCall(funcCall)
+			if err != nil {
+				continue
+			}
+			if pkg == "" {
+				funcCallNames = append(funcCallNames, funcName)
+			} else {
+				funcCallNames = append(funcCallNames, pkg+"."+funcName)
+			}
+		}
+		taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, funcCallNames)
+
 		if !logic.CheckNeedRunAndMergeVarNames(taskCtx, result) {
 			continue
 		}

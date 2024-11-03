@@ -55,6 +55,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 	if nodeInfo.Type == "*ast.Ident" || nodeInfo.Type == "*ast.SelectorExpr" {
 		expr := nodeInfo.Node.(ast.Expr)
 		newNodeInfo.RelevantTaskResult.IsRelevant = IsTargetVariable(taskCtx, expr)
+		log.Printf("FilterRelevantNodeInfo Ident / SelectorExpr, node:%+v, IsRelevant:%+v", util.JsonString(nodeInfo), newNodeInfo.RelevantTaskResult.IsRelevant)
 		return newNodeInfo
 	}
 
@@ -95,6 +96,12 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 	// CallExpr
 	if nodeInfo.Type == "*ast.CallExpr" && taskCtx.Input.FuncTask.EnableCall {
 		FilterRelevantCallExpr(taskCtx, newNodeInfo)
+		return newNodeInfo
+	}
+
+	// FuncDecl
+	if nodeInfo.Type == "*ast.FuncDecl" {
+		FilterRelevantFuncCalls(taskCtx, nodeInfo)
 		return newNodeInfo
 	}
 
@@ -250,6 +257,19 @@ func GetFileInfoImportMap(taskCtx *model.TaskCtx, fileInfo *model.FileInfo) {
 		}
 		path := util.RemoveQuotesIfPresent(imp.NodeFields["Path"].StringFields["Value"])
 		name := util.GetPackageNameFromPath(path)
+		fileInfo.ImportMap[name] = path
+	}
+	for _, imp := range taskCtx.Input.FuncTask.ExtraImports {
+		name := ""
+		path := imp
+		parts := strings.Split(imp, "|")
+		if len(parts) == 2 {
+			name = parts[0]
+			path = parts[1]
+		}
+		if name == "" {
+			name = util.GetPackageNameFromPath(path)
+		}
 		fileInfo.ImportMap[name] = path
 	}
 	log.Printf("GetFileInfoImportMap ImportMap:%+v", fileInfo.ImportMap)

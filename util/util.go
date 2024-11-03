@@ -157,3 +157,37 @@ func GetAbsoluteImportPath(importPath string) (string, error) {
 	absolutePath := filepath.Join(gopath, "src", importPath)
 	return absolutePath, nil
 }
+
+func SetSubTask(funcTask *model.FuncTask) {
+	funcTask.RecvTypes = ""
+	funcTask.Comments = nil
+	funcTask.FuncCalls = nil
+	funcTask.ExtraImports = nil
+}
+
+// MergeFuncTaskFromResult these are from input.
+func MergeFuncTaskFromResult(funcTask *model.FuncTask, result *model.FuncTaskResult) {
+	funcTask.Comments = result.FuncTask.Comments
+	funcTask.FuncCalls = result.FuncTask.FuncCalls
+	funcTask.ExtraImports = result.FuncTask.ExtraImports
+}
+
+// ParseFuncCall parses a string of the form "r|a.F" and returns r, a, and F.
+func ParseFuncCall(input string) (string, string, string, error) {
+	parts := strings.Split(input, "|")
+	if len(parts) != 2 {
+		return "", "", "", fmt.Errorf("input string is not in the form 'r|a.F'")
+	}
+
+	r := parts[0]
+
+	subParts := strings.Split(parts[1], ".")
+	if len(subParts) != 2 {
+		return "", "", "", fmt.Errorf("the part after '|' is not in the form 'a.F'")
+	}
+
+	a := subParts[0]
+	F := subParts[1]
+
+	return r, a, F, nil
+}
