@@ -112,6 +112,9 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 }
 
 func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
+	if taskCtx.Input.FuncTask.SubsequenceMatch {
+		return IsTargetVariableSubsequenceMatch(taskCtx, expr)
+	}
 	var nameParts []string
 	switch x := expr.(type) {
 	case *ast.Ident:
@@ -141,6 +144,26 @@ func IsTargetVariable(taskCtx *model.TaskCtx, expr ast.Expr) bool {
 	return false
 }
 
+func IsTargetVariableSubsequenceMatch(taskCtx *model.TaskCtx, expr ast.Expr) bool {
+	var nameParts []string
+	switch x := expr.(type) {
+	case *ast.Ident:
+		nameParts = []string{x.Name}
+	case *ast.SelectorExpr:
+		// If varName is in the form of "a.B.C", construct the full name from SelectorExpr
+		nameParts = GetSelectorExprNameParts(x)
+	default:
+		return false
+	}
+	for _, varName := range taskCtx.Input.FuncTask.VarNames {
+		varNameParts := strings.Split(varName, ".")
+		if IsSubsequence(nameParts, varNameParts) {
+			return true
+		}
+	}
+	return false
+}
+
 // GetSelectorExprNameParts recursively constructs the full variable name from a SelectorExpr,
 // which can represent an expression like "a.B.C".
 func GetSelectorExprNameParts(expr *ast.SelectorExpr) []string {
@@ -157,6 +180,27 @@ func GetSelectorExprNameParts(expr *ast.SelectorExpr) []string {
 		expr = x
 	}
 	return parts
+}
+
+// IsSubsequence checks if needle is a subsequence of haystack
+func IsSubsequence(needle, haystack []string) bool {
+	if len(needle) == 0 {
+		return true
+	}
+	if len(haystack) == 0 {
+		return false
+	}
+
+	needleIdx := 0
+	for _, haystackElem := range haystack {
+		if haystackElem == needle[needleIdx] {
+			needleIdx++
+			if needleIdx == len(needle) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func GetFuncNodeInfo(taskCtx *model.TaskCtx) *model.NodeInfo {

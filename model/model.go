@@ -27,6 +27,7 @@ type FuncTask struct {
 	ShowBreak        bool                   `json:"show_break"`
 	ShowContinue     bool                   `json:"show_continue"`
 	ExactMatch       bool                   `json:"exact_match"`
+	SubsequenceMatch bool                   `json:"subsequence_match"`
 	EnableCall       bool                   `json:"enable_call"`
 	FarawayMatch     bool                   `json:"faraway_match"`
 	OnlyRelevantFunc bool                   `json:"only_relevant_func"`
