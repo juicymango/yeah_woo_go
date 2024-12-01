@@ -115,6 +115,10 @@ func GetFuncTaskKey(funcTask model.FuncTask) model.FuncTaskKey {
 	}
 }
 
+func FuncTaskKeyToString(key model.FuncTaskKey) string {
+	return fmt.Sprintf("%s:%s|%s", key.Source, key.RecvTypes, key.FuncName)
+}
+
 func GetPackageNameFromPath(packagePath string) string {
 	// Split the path into segments based on '/'
 	segments := strings.Split(packagePath, "/")

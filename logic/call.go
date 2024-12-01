@@ -46,7 +46,7 @@ func FilterRelevantCallExprLocalFunc(taskCtx *model.TaskCtx, nodeInfo *model.Nod
 	FilterRelevantCallExprFunc(taskCtx, nodeInfo, dir, "", funcName, false)
 }
 
-// FilterRelevantCallExprFunc TODO: only support single receiver
+// FilterRelevantCallExprFunc all calls come here. TODO: only support single receiver
 func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo, dir string, receiver string, funcName string, isManual bool) {
 	isFunNameRelevant := isManual || slices.Contains(taskCtx.Input.FuncTask.VarNames, funcName)
 	if !isFunNameRelevant && taskCtx.Input.FuncTask.OnlyRelevantFunc {
@@ -67,6 +67,7 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 	log.Printf("FilterRelevantCallExpr GrepResult, dir:%s, targetString:%s, targetFilePaths:%+v", dir, targetString, targetFilePaths)
 
 	currentFuncTask := taskCtx.Input.FuncTask
+	currentResult := GetFuncTaskResult(taskCtx)
 	util.SetSubTask(&taskCtx.Input.FuncTask)
 	taskCtx.Input.FuncTask.FuncName = funcName
 	taskCtx.Input.FuncTask.RecvTypes = receiver
@@ -92,6 +93,16 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 		if len(taskCtx.Input.FuncTask.VarNames) == 0 && !isFunNameRelevant {
 			continue
 		}
+
+		if currentResult.CalleeMap == nil {
+			currentResult.CalleeMap = make(map[model.FuncTaskKey]*model.FuncTaskResult)
+		}
+		currentResult.CalleeMap[util.GetFuncTaskKey(result.FuncTask)] = result
+		if result.CallerMap == nil {
+			result.CallerMap = make(map[model.FuncTaskKey]*model.FuncTaskResult)
+		}
+		result.CallerMap[util.GetFuncTaskKey(currentResult.FuncTask)] = currentResult
+
 		if CheckNeedRunAndMergeVarNames(taskCtx, result) {
 			result.FilterRelevantNodeInfo = FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
 			log.Printf("FilterRelevantCallExpr NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(result.FilterRelevantNodeInfo.RelevantTaskResult))
@@ -234,4 +245,46 @@ func FilterRelevantFuncCalls(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) {
 		}
 		FilterRelevantCallExprFunc(taskCtx, nil, dir, recv, funcName, true)
 	}
+}
+
+func GenCalleeTree(result *model.FuncTaskResult) {
+	result.FuncTask.CalleeTree = GenCalleeTreeSub(result, nil)
+}
+
+func GenCalleeTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool) map[string]interface{} {
+	key := util.FuncTaskKeyToString(util.GetFuncTaskKey(result.FuncTask))
+	if hasGenMap == nil {
+		hasGenMap = make(map[string]bool)
+	}
+	hasGenMap[key] = true
+	tree := make(map[string]interface{}, len(result.CalleeMap))
+	for calleeKey, calleeResult := range result.CalleeMap {
+		calleeKeyStr := util.FuncTaskKeyToString(calleeKey)
+		if hasGenMap[calleeKeyStr] {
+			continue
+		}
+		tree[calleeKeyStr] = GenCalleeTreeSub(calleeResult, hasGenMap)
+	}
+	return tree
+}
+
+func GenCallerTree(result *model.FuncTaskResult) {
+	result.FuncTask.CallerTree = GenCallerTreeSub(result, nil)
+}
+
+func GenCallerTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool) map[string]interface{} {
+	key := util.FuncTaskKeyToString(util.GetFuncTaskKey(result.FuncTask))
+	if hasGenMap == nil {
+		hasGenMap = make(map[string]bool)
+	}
+	hasGenMap[key] = true
+	tree := make(map[string]interface{}, len(result.CallerMap))
+	for callerKey, callerResult := range result.CallerMap {
+		callerKeyStr := util.FuncTaskKeyToString(callerKey)
+		if hasGenMap[callerKeyStr] {
+			continue
+		}
+		tree[callerKeyStr] = GenCallerTreeSub(callerResult, hasGenMap)
+	}
+	return tree
 }

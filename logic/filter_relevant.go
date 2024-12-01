@@ -53,6 +53,9 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 
 	// Ident / SelectorExpr
 	if nodeInfo.Type == "*ast.Ident" || nodeInfo.Type == "*ast.SelectorExpr" {
+		if newNodeInfo.RelevantTaskResult.IsRelevant {
+			return newNodeInfo
+		}
 		expr := nodeInfo.Node.(ast.Expr)
 		newNodeInfo.RelevantTaskResult.IsRelevant = IsTargetVariable(taskCtx, expr)
 		log.Printf("FilterRelevantNodeInfo Ident / SelectorExpr, node:%+v, IsRelevant:%+v", util.JsonString(nodeInfo), newNodeInfo.RelevantTaskResult.IsRelevant)

@@ -8,25 +8,28 @@ import (
 
 type Input struct {
 	Method   string     `json:"method"`
-	FuncTask FuncTask   `json:"-"`
+	FuncTask FuncTask   `json:"func_task"`
 	Funcs    []FuncTask `json:"funcs"`
 }
 
 type FuncTask struct {
-	Source           string   `json:"source"`
-	RecvTypes        string   `json:"recv_types"` // seperated by ","
-	FuncName         string   `json:"func_name"`
-	Comments         []string `json:"comments"`
-	VarNames         []string `json:"var_names"`
-	FuncCalls        []string `json:"func_calls"`    // "recv|a.F"
-	ExtraImports     []string `json:"extra_imports"` // "name|path"
-	ShowReturn       bool     `json:"show_return"`
-	ShowBreak        bool     `json:"show_break"`
-	ShowContinue     bool     `json:"show_continue"`
-	ExactMatch       bool     `json:"exact_match"`
-	EnableCall       bool     `json:"enable_call"`
-	FarawayMatch     bool     `json:"faraway_match"`
-	OnlyRelevantFunc bool     `json:"only_relevant_func"`
+	Key              string                 `json:"key"`
+	Source           string                 `json:"source"`
+	RecvTypes        string                 `json:"recv_types"` // seperated by ","
+	FuncName         string                 `json:"func_name"`
+	Comments         []string               `json:"comments"`
+	VarNames         []string               `json:"var_names"`
+	FuncCalls        []string               `json:"func_calls"`    // "recv|a.F"
+	ExtraImports     []string               `json:"extra_imports"` // "name|path"
+	CalleeTree       map[string]interface{} `json:"callee_tree"`
+	CallerTree       map[string]interface{} `json:"caller_tree"`
+	ShowReturn       bool                   `json:"show_return"`
+	ShowBreak        bool                   `json:"show_break"`
+	ShowContinue     bool                   `json:"show_continue"`
+	ExactMatch       bool                   `json:"exact_match"`
+	EnableCall       bool                   `json:"enable_call"`
+	FarawayMatch     bool                   `json:"faraway_match"`
+	OnlyRelevantFunc bool                   `json:"only_relevant_func"`
 }
 
 type FuncTaskKey struct {
@@ -41,6 +44,8 @@ type FuncTaskResult struct {
 	FilterRelevantNodeInfo *NodeInfo
 	IsFromInput            bool
 	Started                bool
+	CalleeMap              map[FuncTaskKey]*FuncTaskResult
+	CallerMap              map[FuncTaskKey]*FuncTaskResult
 }
 
 type TaskCtx struct {

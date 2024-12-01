@@ -69,6 +69,7 @@ func GetFileNodeInfo(filePath string, input *model.Input) {
 	// Parse the file containing the Go program
 	fileNode, err := parser.ParseFile(fset, input.FuncTask.Source, nil, parser.ParseComments)
 	if err != nil {
+		log.Printf("GetFileNodeInfo ParseFileErr, input.FuncTask %+v", util.JsonString(input.FuncTask))
 		panic(err)
 	}
 
@@ -99,19 +100,21 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 			continue
 		}
 
-		funcCallNames := make([]string, 0, len(taskCtx.Input.FuncTask.FuncCalls))
-		for _, funcCall := range taskCtx.Input.FuncTask.FuncCalls {
-			_, pkg, funcName, err := util.ParseFuncCall(funcCall)
-			if err != nil {
-				continue
+		/*
+			funcCallNames := make([]string, 0, len(taskCtx.Input.FuncTask.FuncCalls))
+			for _, funcCall := range taskCtx.Input.FuncTask.FuncCalls {
+				_, pkg, funcName, err := util.ParseFuncCall(funcCall)
+				if err != nil {
+					continue
+				}
+				if pkg == "" {
+					funcCallNames = append(funcCallNames, funcName)
+				} else {
+					funcCallNames = append(funcCallNames, pkg+"."+funcName)
+				}
 			}
-			if pkg == "" {
-				funcCallNames = append(funcCallNames, funcName)
-			} else {
-				funcCallNames = append(funcCallNames, pkg+"."+funcName)
-			}
-		}
-		taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, funcCallNames)
+			taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, funcCallNames)
+		*/
 
 		if !logic.CheckNeedRunAndMergeVarNames(taskCtx, result) {
 			continue
@@ -124,17 +127,21 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		if !result.IsFromInput && (result.FilterRelevantNodeInfo == nil || !result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant) {
 			continue
 		}
+		result.FuncTask.Key = util.FuncTaskKeyToString(util.GetFuncTaskKey(result.FuncTask))
+		logic.GenCalleeTree(result)
+		logic.GenCallerTree(result)
 		taskCtx.Input.Funcs = append(taskCtx.Input.Funcs, result.FuncTask)
-		formattedJSON, err := FormatJSONObject(result.FuncTask)
-		if err == nil {
-			fmt.Printf("/*\n%s\n*/\n", formattedJSON)
-		}
+		// formattedJSON, err := FormatJSONObject(result.FuncTask)
+		// if err == nil {
+		// 	 fmt.Printf("/*\n%s\n*/\n", formattedJSON)
+		// }
+		fmt.Printf("//\"key\": \"%s\",\n", result.FuncTask.Key)
 		fmt.Printf("//file://%s\n", result.FuncTask.Source)
 		if result.FilterRelevantNodeInfo == nil {
 			continue
 		}
 		util.NodeInfoUpdateNode(result.FilterRelevantNodeInfo)
-		err = printer.Fprint(os.Stdout, taskCtx.FileSet, result.FilterRelevantNodeInfo.Node)
+		err := printer.Fprint(os.Stdout, taskCtx.FileSet, result.FilterRelevantNodeInfo.Node)
 		if err != nil {
 			log.Printf("GetRelevantFuncs FprintErr %+v", err)
 		}
