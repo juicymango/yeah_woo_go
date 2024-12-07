@@ -46,7 +46,7 @@ func FilterRelevantCallExprLocalFunc(taskCtx *model.TaskCtx, nodeInfo *model.Nod
 	FilterRelevantCallExprFunc(taskCtx, nodeInfo, dir, "", funcName, false)
 }
 
-// FilterRelevantCallExprFunc all calls come here. TODO: only support single receiver
+// FilterRelevantCallExprFunc TODO: only support single receiver
 func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo, dir string, receiver string, funcName string, isManual bool) {
 	isFunNameRelevant := isManual || slices.Contains(taskCtx.Input.FuncTask.VarNames, funcName)
 	if !isFunNameRelevant && taskCtx.Input.FuncTask.OnlyRelevantFunc {
@@ -68,27 +68,29 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 
 	currentFuncTask := taskCtx.Input.FuncTask
 	currentResult := GetFuncTaskResult(taskCtx)
-	util.SetSubTask(&taskCtx.Input.FuncTask)
-	taskCtx.Input.FuncTask.FuncName = funcName
-	taskCtx.Input.FuncTask.RecvTypes = receiver
 	for _, filePath := range targetFilePaths {
-		// new FuncTask
+		taskCtx.Input.FuncTask = currentFuncTask
+		util.SetSubTask(&taskCtx.Input.FuncTask)
+		taskCtx.Input.FuncTask.FuncName = funcName
+		taskCtx.Input.FuncTask.RecvTypes = receiver
 		taskCtx.Input.FuncTask.Source = filePath
 		result := GetFuncTaskResult(taskCtx)
 		if result.FuncNodeInfo == nil {
 			continue
 		}
-		util.MergeFuncTaskFromResult(&taskCtx.Input.FuncTask, result)
+		taskCtx.Input.FuncTask = result.FuncTask
+		if taskCtx.Input.FuncTask.FarawayMatch {
+			taskCtx.Input.FuncTask.VarNames = currentFuncTask.VarNames
+		}
+
 		relevantFieldNames := GetRelevantFuncFieldNames(taskCtx, nodeInfo, result.FuncNodeInfo)
 		if taskCtx.Input.FuncTask.OnlyRelevantFunc {
 			relevantFieldNames = nil
 		}
-		if !taskCtx.Input.FuncTask.FarawayMatch {
-			taskCtx.Input.FuncTask.VarNames = nil
-		}
 		if len(relevantFieldNames) > 0 {
 			taskCtx.Input.FuncTask.VarNames = util.MergeAndDeduplicate(taskCtx.Input.FuncTask.VarNames, relevantFieldNames)
 		}
+
 		log.Printf("FilterRelevantCallExpr GrepResult, dir:%s, targetString:%s, targetFilePaths:%+v", dir, targetString, targetFilePaths)
 		if len(taskCtx.Input.FuncTask.VarNames) == 0 && !isFunNameRelevant {
 			continue
@@ -115,6 +117,38 @@ func FilterRelevantCallExprFunc(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo
 				nodeInfo.RelevantTaskResult.IsRelevant = true
 			}
 		}
+	}
+	taskCtx.Input.FuncTask = currentFuncTask
+}
+
+func FilterRelevantFuncCallerKey(taskCtx *model.TaskCtx, filePath string, receiver string, funcName string) {
+	currentFuncTask := taskCtx.Input.FuncTask
+	currentResult := GetFuncTaskResult(taskCtx)
+	util.SetSubTask(&taskCtx.Input.FuncTask)
+	taskCtx.Input.FuncTask.FuncName = funcName
+	taskCtx.Input.FuncTask.RecvTypes = receiver
+	taskCtx.Input.FuncTask.Source = filePath
+	// new FuncTask
+	result := GetFuncTaskResult(taskCtx)
+	if result.FuncNodeInfo == nil {
+		return
+	}
+	taskCtx.Input.FuncTask = result.FuncTask
+	if currentResult.CallerMap == nil {
+		currentResult.CallerMap = make(map[model.FuncTaskKey]*model.FuncTaskResult)
+	}
+	currentResult.CallerMap[util.GetFuncTaskKey(result.FuncTask)] = result
+	if result.CalleeMap == nil {
+		result.CalleeMap = make(map[model.FuncTaskKey]*model.FuncTaskResult)
+	}
+	result.CalleeMap[util.GetFuncTaskKey(currentResult.FuncTask)] = currentResult
+
+	if CheckNeedRunAndMergeVarNames(taskCtx, result) {
+		result.FilterRelevantNodeInfo = FilterRelevantNodeInfo(taskCtx, result.FuncNodeInfo)
+		log.Printf("FilterRelevantFuncCallerKey NewTaskResult, task:%s, result:%s", util.JsonString(taskCtx.Input.FuncTask), util.JsonString(result.FilterRelevantNodeInfo.RelevantTaskResult))
+	}
+	if result.FilterRelevantNodeInfo != nil && result.FilterRelevantNodeInfo.RelevantTaskResult != nil {
+		result.FilterRelevantNodeInfo.RelevantTaskResult.IsRelevant = true
 	}
 	taskCtx.Input.FuncTask = currentFuncTask
 }
@@ -247,44 +281,72 @@ func FilterRelevantFuncCalls(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) {
 	}
 }
 
-func GenCalleeTree(result *model.FuncTaskResult) {
-	result.FuncTask.CalleeTree = GenCalleeTreeSub(result, nil)
+func FilterRelevantFuncCallerKeys(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) {
+	if nodeInfo == nil {
+		return
+	}
+	if nodeInfo.Type != "*ast.FuncDecl" {
+		return
+	}
+	fileInfo := GetFileInfo(taskCtx)
+	if fileInfo == nil {
+		log.Printf("FilterRelevantFuncCalls fileInfo nil, FuncTask:%+v", util.JsonString(taskCtx.Input.FuncTask))
+		return
+	}
+	for _, key := range taskCtx.Input.FuncTask.FuncCallerKeys {
+		funcTaskKey, err := util.StringToFuncTaskKey(key)
+		if err != nil {
+			log.Printf("FilterRelevantFuncCallerKeys StringToFuncTaskKey fail, key:%s err:%+v", key, err)
+			continue
+		}
+		FilterRelevantFuncCallerKey(taskCtx, funcTaskKey.Source, funcTaskKey.RecvTypes, funcTaskKey.FuncName)
+	}
 }
 
-func GenCalleeTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool) map[string]interface{} {
+func GenCalleeTree(result *model.FuncTaskResult) {
+	result.FuncTask.CalleeTree = GenCalleeTreeSub(result, nil, result.FuncTask.CollectComments)
+}
+
+func GenCalleeTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool, collectComments bool) map[string]interface{} {
 	key := util.FuncTaskKeyToString(util.GetFuncTaskKey(result.FuncTask))
 	if hasGenMap == nil {
 		hasGenMap = make(map[string]bool)
 	}
 	hasGenMap[key] = true
-	tree := make(map[string]interface{}, len(result.CalleeMap))
+	tree := make(map[string]interface{}, len(result.CalleeMap)+1)
+	if collectComments && len(result.FuncTask.Comments) > 0 {
+		tree["comments"] = result.FuncTask.Comments
+	}
 	for calleeKey, calleeResult := range result.CalleeMap {
 		calleeKeyStr := util.FuncTaskKeyToString(calleeKey)
 		if hasGenMap[calleeKeyStr] {
 			continue
 		}
-		tree[calleeKeyStr] = GenCalleeTreeSub(calleeResult, hasGenMap)
+		tree[calleeKeyStr] = GenCalleeTreeSub(calleeResult, hasGenMap, collectComments)
 	}
 	return tree
 }
 
 func GenCallerTree(result *model.FuncTaskResult) {
-	result.FuncTask.CallerTree = GenCallerTreeSub(result, nil)
+	result.FuncTask.CallerTree = GenCallerTreeSub(result, nil, result.FuncTask.CollectComments)
 }
 
-func GenCallerTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool) map[string]interface{} {
+func GenCallerTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool, collectComments bool) map[string]interface{} {
 	key := util.FuncTaskKeyToString(util.GetFuncTaskKey(result.FuncTask))
 	if hasGenMap == nil {
 		hasGenMap = make(map[string]bool)
 	}
 	hasGenMap[key] = true
-	tree := make(map[string]interface{}, len(result.CallerMap))
+	tree := make(map[string]interface{}, len(result.CallerMap)+1)
+	if collectComments && len(result.FuncTask.Comments) > 0 {
+		tree["comments"] = result.FuncTask.Comments
+	}
 	for callerKey, callerResult := range result.CallerMap {
 		callerKeyStr := util.FuncTaskKeyToString(callerKey)
 		if hasGenMap[callerKeyStr] {
 			continue
 		}
-		tree[callerKeyStr] = GenCallerTreeSub(callerResult, hasGenMap)
+		tree[callerKeyStr] = GenCallerTreeSub(callerResult, hasGenMap, collectComments)
 	}
 	return tree
 }

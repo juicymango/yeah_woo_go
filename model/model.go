@@ -19,7 +19,8 @@ type FuncTask struct {
 	FuncName         string                 `json:"func_name"`
 	Comments         []string               `json:"comments"`
 	VarNames         []string               `json:"var_names"`
-	FuncCalls        []string               `json:"func_calls"`    // "recv|a.F"
+	FuncCalls        []string               `json:"func_calls"` // "recv|a.F"
+	FuncCallerKeys   []string               `json:"func_caller_keys"`
 	ExtraImports     []string               `json:"extra_imports"` // "name|path"
 	CalleeTree       map[string]interface{} `json:"callee_tree"`
 	CallerTree       map[string]interface{} `json:"caller_tree"`
@@ -31,6 +32,7 @@ type FuncTask struct {
 	EnableCall       bool                   `json:"enable_call"`
 	FarawayMatch     bool                   `json:"faraway_match"`
 	OnlyRelevantFunc bool                   `json:"only_relevant_func"`
+	CollectComments  bool                   `json:"collect_comments"`
 }
 
 type FuncTaskKey struct {

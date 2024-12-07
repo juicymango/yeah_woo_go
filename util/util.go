@@ -119,6 +119,32 @@ func FuncTaskKeyToString(key model.FuncTaskKey) string {
 	return fmt.Sprintf("%s:%s|%s", key.Source, key.RecvTypes, key.FuncName)
 }
 
+func StringToFuncTaskKey(s string) (model.FuncTaskKey, error) {
+	// Split the string into two parts: source and the rest
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return model.FuncTaskKey{}, fmt.Errorf("invalid format: missing colon separator")
+	}
+
+	source := parts[0]
+	rest := parts[1]
+
+	// Split the rest into recv_types and func_name
+	parts = strings.SplitN(rest, "|", 2)
+	if len(parts) != 2 {
+		return model.FuncTaskKey{}, fmt.Errorf("invalid format: missing pipe separator")
+	}
+
+	recvTypes := parts[0]
+	funcName := parts[1]
+
+	return model.FuncTaskKey{
+		Source:    source,
+		RecvTypes: recvTypes,
+		FuncName:  funcName,
+	}, nil
+}
+
 func GetPackageNameFromPath(packagePath string) string {
 	// Split the path into segments based on '/'
 	segments := strings.Split(packagePath, "/")
@@ -162,18 +188,16 @@ func GetAbsoluteImportPath(importPath string) (string, error) {
 	return absolutePath, nil
 }
 
+// SetSubTask set things not wanting to be inherited
 func SetSubTask(funcTask *model.FuncTask) {
+	funcTask.FuncName = ""
 	funcTask.RecvTypes = ""
+	funcTask.Source = ""
 	funcTask.Comments = nil
 	funcTask.FuncCalls = nil
+	funcTask.FuncCallerKeys = nil
 	funcTask.ExtraImports = nil
-}
-
-// MergeFuncTaskFromResult these are from input.
-func MergeFuncTaskFromResult(funcTask *model.FuncTask, result *model.FuncTaskResult) {
-	funcTask.Comments = result.FuncTask.Comments
-	funcTask.FuncCalls = result.FuncTask.FuncCalls
-	funcTask.ExtraImports = result.FuncTask.ExtraImports
+	funcTask.VarNames = nil
 }
 
 // ParseFuncCall parses a string of the form "r|a.F" and returns r, a, and F.

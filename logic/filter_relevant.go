@@ -105,6 +105,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 	// FuncDecl
 	if nodeInfo.Type == "*ast.FuncDecl" {
 		FilterRelevantFuncCalls(taskCtx, nodeInfo)
+		FilterRelevantFuncCallerKeys(taskCtx, nodeInfo)
 		return newNodeInfo
 	}
 
