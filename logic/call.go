@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"slices"
+	"maps"
 
 	"github.com/juicymango/yeah_woo_go/model"
 	"github.com/juicymango/yeah_woo_go/util"
@@ -322,7 +323,7 @@ func GenCalleeTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool, c
 		if hasGenMap[calleeKeyStr] {
 			continue
 		}
-		tree[calleeKeyStr] = GenCalleeTreeSub(calleeResult, hasGenMap, collectComments)
+		tree[calleeKeyStr] = GenCalleeTreeSub(calleeResult, maps.Clone(hasGenMap), collectComments)
 	}
 	return tree
 }
@@ -346,7 +347,7 @@ func GenCallerTreeSub(result *model.FuncTaskResult, hasGenMap map[string]bool, c
 		if hasGenMap[callerKeyStr] {
 			continue
 		}
-		tree[callerKeyStr] = GenCallerTreeSub(callerResult, hasGenMap, collectComments)
+		tree[callerKeyStr] = GenCallerTreeSub(callerResult, maps.Clone(hasGenMap), collectComments)
 	}
 	return tree
 }

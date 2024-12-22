@@ -27,7 +27,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 		}
 		newNodeInfo.NodeFields[name] = fieldNewNodeInfo
 		if fieldNewNodeInfo.RelevantTaskResult != nil {
-			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant {
+			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant || taskCtx.Input.FuncTask.ShowAll {
 				newNodeInfo.RelevantTaskResult.IsRelevant = true
 			}
 			if fieldNewNodeInfo.RelevantTaskResult.NotFilterByBlock {
@@ -42,7 +42,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 				continue
 			}
 			newNodeInfo.NodeListFields[name][idx] = fieldNewNodeInfo
-			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant {
+			if fieldNewNodeInfo.RelevantTaskResult.IsRelevant || taskCtx.Input.FuncTask.ShowAll {
 				newNodeInfo.RelevantTaskResult.IsRelevant = true
 			}
 			if fieldNewNodeInfo.RelevantTaskResult.NotFilterByBlock {
@@ -57,7 +57,7 @@ func FilterRelevantNodeInfo(taskCtx *model.TaskCtx, nodeInfo *model.NodeInfo) *m
 			return newNodeInfo
 		}
 		expr := nodeInfo.Node.(ast.Expr)
-		newNodeInfo.RelevantTaskResult.IsRelevant = IsTargetVariable(taskCtx, expr)
+		newNodeInfo.RelevantTaskResult.IsRelevant = IsTargetVariable(taskCtx, expr) || taskCtx.Input.FuncTask.ShowAll
 		log.Printf("FilterRelevantNodeInfo Ident / SelectorExpr, node:%+v, IsRelevant:%+v", util.JsonString(nodeInfo), newNodeInfo.RelevantTaskResult.IsRelevant)
 		return newNodeInfo
 	}

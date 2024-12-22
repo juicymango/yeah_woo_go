@@ -33,6 +33,7 @@ type FuncTask struct {
 	FarawayMatch     bool                   `json:"faraway_match"`
 	OnlyRelevantFunc bool                   `json:"only_relevant_func"`
 	CollectComments  bool                   `json:"collect_comments"`
+	ShowAll          bool                   `json:"show_all"`
 }
 
 type FuncTaskKey struct {
