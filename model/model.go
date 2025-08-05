@@ -36,6 +36,13 @@ type FuncTask struct {
 	ShowAll          bool                   `json:"show_all"`
 }
 
+type FuncTaskOutput struct {
+	Key        string                 `json:"key"`
+	Comments   []string               `json:"comments"`
+	CalleeTree map[string]interface{} `json:"callee_tree"`
+	CallerTree map[string]interface{} `json:"caller_tree"`
+}
+
 type FuncTaskKey struct {
 	Source    string `json:"source"`
 	RecvTypes string `json:"recv_types"`

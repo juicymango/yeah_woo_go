@@ -131,17 +131,27 @@ func GetRelevantFuncs(filePath string, input *model.Input) {
 		logic.GenCalleeTree(result)
 		logic.GenCallerTree(result)
 		taskCtx.Input.Funcs = append(taskCtx.Input.Funcs, result.FuncTask)
-		// formattedJSON, err := FormatJSONObject(result.FuncTask)
-		// if err == nil {
-		// 	 fmt.Printf("/*\n%s\n*/\n", formattedJSON)
-		// }
-		fmt.Printf("//\"key\": \"%s\",\n", result.FuncTask.Key)
+
+		// Extract only FuncTaskOutput fields from FuncTask
+		output := model.FuncTaskOutput{
+			Key:        result.FuncTask.Key,
+			Comments:   result.FuncTask.Comments,
+			CalleeTree: result.FuncTask.CalleeTree,
+			CallerTree: result.FuncTask.CallerTree,
+		}
+
+		formattedJSON, err := FormatJSONObject(output)
+		if err == nil {
+			fmt.Printf("/*\n%s\n*/\n", formattedJSON)
+		}
+
+		// fmt.Printf("//\"key\": \"%s\",\n", result.FuncTask.Key)
 		fmt.Printf("//file://%s\n", result.FuncTask.Source)
 		if result.FilterRelevantNodeInfo == nil {
 			continue
 		}
 		util.NodeInfoUpdateNode(result.FilterRelevantNodeInfo)
-		err := printer.Fprint(os.Stdout, taskCtx.FileSet, result.FilterRelevantNodeInfo.Node)
+		err = printer.Fprint(os.Stdout, taskCtx.FileSet, result.FilterRelevantNodeInfo.Node)
 		if err != nil {
 			log.Printf("GetRelevantFuncs FprintErr %+v", err)
 		}
